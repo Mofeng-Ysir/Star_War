@@ -4,6 +4,8 @@
 #include <QHBoxLayout>
 #include <QPainter>
 #include <QMessageBox>
+#include <QFileInfo>
+#include <QDebug>
 
 PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
 {
@@ -36,12 +38,25 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
         btn->setFixedSize(120, 120);
         btn->setStyleSheet("background-color: rgba(0,0,0,150); border: 2px solid #555; border-radius: 10px;");
 
-        // 设置图标 (假设 assets/hero.png 是飞机1, assets/hero1.png 是飞机2...)
-        // 如果没有多余图片，暂时都用 hero.png，或者你可以去P几张不同颜色的
-        QString imgPath = (i == 0) ? "assets/hero.png" : QString("assets/enemy%1.png").arg(i);
-        // 临时借用 enemy 图片当其他飞机
-        if (i == 3)
-            imgPath = "assets/enemy2.png";
+        // --- 修改开始：根据 ID 加载不同的飞机图片 ---
+        QString imgPath;
+        if (i == 0)
+        {
+            imgPath = "assets/hero.png"; // 初始机
+        }
+        else
+        {
+            // 对应 assets/plane1.png, assets/plane2.png ...
+            imgPath = QString("assets/plane%1.png").arg(i);
+        }
+
+        // 检查文件是否存在，不存在则用默认图兜底，防止空白
+        if (!QFileInfo::exists(imgPath))
+        {
+            qDebug() << "Warning: Image not found:" << imgPath;
+            imgPath = "assets/hero.png";
+        }
+        // --- 修改结束 ---
 
         btn->setIcon(QIcon(imgPath));
         btn->setIconSize(QSize(80, 80));
@@ -51,6 +66,7 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
         planeBtns.append(btn);
         planesLayout->addWidget(btn);
     }
+
     mainLayout->addLayout(planesLayout);
 
     // 下方：详情 + 动作按钮

@@ -92,15 +92,36 @@ void GameWidget::startGame(int level)
     score = 0;
     heroHp = stats.hp; // 使用战机血量
 
-    // 根据飞机换皮肤 (简单实现)
-    QString heroPath = "assets/hero.png";
-    if (currentPlaneId == 1)
-        heroPath = "assets/enemy.png";
-    else if (currentPlaneId == 2)
-        heroPath = "assets/enemy3.png";
+    // --- 修改开始：加载对应的飞机图片 ---
+    QString heroPath;
+    if (currentPlaneId == 0)
+    {
+        heroPath = "assets/hero.png";
+    }
+    else
+    {
+        heroPath = QString("assets/plane%1.png").arg(currentPlaneId);
+    }
 
-    imgHero.load(heroPath);
-    imgHero = imgHero.scaled(60, 60, Qt::KeepAspectRatio);
+    // 尝试加载，如果失败则回退到默认图片
+    if (!imgHero.load(heroPath))
+    {
+        qDebug() << "Failed to load hero image:" << heroPath << "Using default.";
+        imgHero.load("assets/hero.png");
+    }
+
+    // 统一缩放大小 (或者你可以根据飞机ID设置不同的大小)
+    if (currentPlaneId == 2)
+    {
+        // 比如：泰坦(ID=2)比较大
+        imgHero = imgHero.scaled(80, 80, Qt::KeepAspectRatio);
+    }
+    else
+    {
+        // 其他飞机正常大小
+        imgHero = imgHero.scaled(60, 60, Qt::KeepAspectRatio);
+    }
+    // --- 修改结束 ---
 
     // 状态重置
     isGameOver = false;
