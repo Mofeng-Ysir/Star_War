@@ -7,6 +7,7 @@
 #include "GameWidget.h"
 #include "HighScoreWidget.h"
 #include "LevelSelectWidget.h"
+#include "PlaneSelectWidget.h" // 引用新头文件
 
 class MainWindow : public QWidget
 {
@@ -20,6 +21,7 @@ private:
     GameWidget *game;
     HighScoreWidget *highScore;
     LevelSelectWidget *levelSelect;
+    PlaneSelectWidget *planeSelect; // 新增指针
 };
 
 #endif // MAINWINDOW_H

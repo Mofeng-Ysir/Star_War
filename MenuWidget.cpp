@@ -63,6 +63,12 @@ MenuWidget::MenuWidget(QWidget *parent) : QWidget(parent)
     btnStart->setCursor(Qt::PointingHandCursor);
     connect(btnStart, &QPushButton::clicked, this, &MenuWidget::startClicked);
 
+    // 【新增】战机中心按钮
+    QPushButton *btnGarage = new QPushButton("战机中心");
+    btnGarage->setStyleSheet(btnStyle);
+    btnGarage->setCursor(Qt::PointingHandCursor);
+    connect(btnGarage, &QPushButton::clicked, this, &MenuWidget::garageClicked);
+
     QPushButton *btnHistory = new QPushButton("历史记录");
     btnHistory->setStyleSheet(btnStyle);
     btnHistory->setCursor(Qt::PointingHandCursor);
@@ -76,6 +82,7 @@ MenuWidget::MenuWidget(QWidget *parent) : QWidget(parent)
     QVBoxLayout *btnLayout = new QVBoxLayout();
     btnLayout->setAlignment(Qt::AlignCenter);
     btnLayout->addWidget(btnStart);
+    btnLayout->addWidget(btnGarage); // 加入布局
     btnLayout->addWidget(btnHistory);
     btnLayout->addWidget(btnExit);
 

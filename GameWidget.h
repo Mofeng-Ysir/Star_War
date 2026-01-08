@@ -11,7 +11,7 @@
 #include <QVideoSink>
 #include <QVideoFrame>
 #include "common.h"
-#include "BossStrategy.h" // 引入新模块
+#include "BossStrategy.h"
 
 class GameWidget : public QWidget
 {
@@ -39,20 +39,20 @@ private:
     void spawnBoss();
     void checkCollisions();
     void drawProgressBar(QPainter &p);
-    void drawLaserUI(QPainter &p);
-    void fireLaser();
+    void drawUltUI(QPainter &p); // 改名为 Ult (大招)
+    void fireUlt();              // 改名为 fireUlt
     void gameOver();
     void victory();
     void cleanUp();
 
     // 资源
     QImage imgHero, imgEnemy1, imgEnemy2, imgEnemy3, imgBg;
-    QImage imgLaserIcon;
+    QImage imgUltIcon; // 大招图标
 
     // 音频
     QSoundEffect *shootSfx;
     QSoundEffect *explodeSfx;
-    QSoundEffect *laserSfx;
+    QSoundEffect *ultSfx; // 大招音效
     QMediaPlayer *bgmPlayer;
     QAudioOutput *bgmOutput;
 
@@ -77,15 +77,24 @@ private:
     bool bossSpawned;
     int enemySpawnTimer;
 
-    // --- 新模块对象 ---
+    // 策略模块
     BossStrategy bossStrategy;
 
-    // 大招变量
-    bool isLaserActive;
-    int laserDurationTimer;
-    int laserCooldownTimer;
-    const int LASER_COOLDOWN_MAX = 500;
-    const int LASER_DURATION_MAX = 20;
+    // --- 战机与技能系统 ---
+    int currentPlaneId; // 当前战机ID
+
+    // 技能状态
+    bool isUltActive;     // 大招持续中 (激光/弹幕等)
+    int ultDurationTimer; // 持续时间计时
+    int ultCooldownTimer; // 冷却计时
+    int ULT_COOLDOWN_MAX; // 最大冷却 (根据飞机不同可变)
+
+    // 特殊状态
+    bool isShieldActive; // 护盾 (幻影号)
+    int shieldTimer;
+
+    bool isTimeFrozen; // 时空冻结 (虚空号)
+    int freezeTimer;
 };
 
 #endif // GAMEWIDGET_H

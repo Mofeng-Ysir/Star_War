@@ -1,6 +1,30 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <QString>
+
+// 飞机类型枚举
+enum PlaneType
+{
+    PLANE_DEFAULT = 0, // 初始机 (激光)
+    PLANE_DOUBLE = 1,  // 双子星 (双发 + 全屏弹幕)
+    PLANE_SHOTGUN = 2, // 泰坦   (散弹 + 核弹清屏)
+    PLANE_SNIPER = 3,  // 幻影   (极速 + 无敌护盾)
+    PLANE_ALIEN = 4    // 虚空   (追踪 + 时空冻结)
+};
+
+// 飞机属性结构体
+struct PlaneStats
+{
+    int id;
+    QString name;
+    QString desc; // 描述
+    int cost;     // 价格
+    int hp;       // 基础血量
+    double speed; // 移动速度
+};
+
+// ... (Bullet, Enemy, LevelConfig 保持不变)
 struct Bullet
 {
     double x, y;
@@ -11,14 +35,12 @@ struct Bullet
 
 struct Enemy
 {
-    int type; // 0:普通, 1:射击, 2:肉盾, 10:BOSS
+    int type;
     double x, y;
     int hp;
     int maxHp;
     bool active;
     int shootTimer;
-
-    // Boss 专用
     double moveAngle;
     int bossId;
 };
@@ -26,9 +48,9 @@ struct Enemy
 struct LevelConfig
 {
     int levelId;
-    int totalWaves;   // 召唤BOSS前的击杀进度需求
-    int enemyHpScale; // 血量倍率
-    int bossHp;       // Boss血量
+    int totalWaves;
+    int enemyHpScale;
+    int bossHp;
 };
 
 #endif // COMMON_H

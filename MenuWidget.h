@@ -18,6 +18,7 @@ public:
 signals:
     void startClicked();
     void historyClicked();
+    void garageClicked(); // 新增信号
 
 protected:
     void paintEvent(QPaintEvent *event) override;

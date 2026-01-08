@@ -18,12 +18,14 @@ add_executable(QtSpaceShooter
     MainWindow.cpp MainWindow.h
     MenuWidget.cpp MenuWidget.h
     LevelSelectWidget.cpp LevelSelectWidget.h
+    PlaneSelectWidget.cpp PlaneSelectWidget.h  # 新增
     GameWidget.cpp GameWidget.h
     HighScoreWidget.cpp HighScoreWidget.h
     ScoreManager.cpp ScoreManager.h
     LevelManager.cpp LevelManager.h
-    BossStrategy.cpp BossStrategy.h      # 新增
-    CollisionSystem.cpp CollisionSystem.h # 新增
+    BossStrategy.cpp BossStrategy.h
+    CollisionSystem.cpp CollisionSystem.h
+    DataManager.cpp DataManager.h              # 新增
     common.h
 )
 
