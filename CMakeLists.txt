@@ -22,6 +22,8 @@ add_executable(QtSpaceShooter
     HighScoreWidget.cpp HighScoreWidget.h
     ScoreManager.cpp ScoreManager.h
     LevelManager.cpp LevelManager.h
+    BossStrategy.cpp BossStrategy.h      # 新增
+    CollisionSystem.cpp CollisionSystem.h # 新增
     common.h
 )
 
