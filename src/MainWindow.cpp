@@ -4,10 +4,13 @@
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
 {
-    setFixedSize(960, 600);
+
+    resize(960, 600);         // 【新增】设置初始大小
+    setMinimumSize(960, 600); // 【新增】设置最小大小，防止缩得太小布局乱掉
+
     setWindowTitle("Qt Space Shooter - Ultimate Edition");
 
-    DataManager::loadData(); // 启动时加载存档
+    DataManager::loadData();
 
     stack = new QStackedWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(this);

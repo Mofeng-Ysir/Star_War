@@ -8,8 +8,7 @@
 #include <QTimer>
 #include <QList>
 #include <QImage>
-#include <QVideoSink>
-#include <QVideoFrame>
+#include <QMovie> // 【新增】GIF支持
 #include "common.h"
 #include "BossStrategy.h"
 
@@ -39,27 +38,31 @@ private:
     void spawnBoss();
     void checkCollisions();
     void drawProgressBar(QPainter &p);
-    void drawUltUI(QPainter &p); // 改名为 Ult (大招)
-    void fireUlt();              // 改名为 fireUlt
+    void drawUltUI(QPainter &p);
+    void fireUlt();
     void gameOver();
     void victory();
     void cleanUp();
 
+    // --- 分辨率适配辅助 ---
+    const int LOGICAL_WIDTH = 960;
+    const int LOGICAL_HEIGHT = 600;
+    void getScaleOffset(double &scale, double &offsetX, double &offsetY);
+    QPointF mapToGame(const QPoint &pos);
+
     // 资源
     QImage imgHero, imgEnemy1, imgEnemy2, imgEnemy3, imgBg;
-    QImage imgUltIcon; // 大招图标
+    QImage imgUltIcon;
 
     // 音频
     QSoundEffect *shootSfx;
     QSoundEffect *explodeSfx;
-    QSoundEffect *ultSfx; // 大招音效
+    QSoundEffect *ultSfx;
     QMediaPlayer *bgmPlayer;
     QAudioOutput *bgmOutput;
 
-    // BOSS 视频
-    QMediaPlayer *bossVideoPlayer;
-    QVideoSink *bossVideoSink;
-    QVideoFrame currentBossFrame;
+    // --- 【核心修改】BOSS 动画组件 ---
+    QMovie *bossMovie; // 替代视频播放器
 
     QTimer *gameTimer;
 
@@ -81,19 +84,18 @@ private:
     BossStrategy bossStrategy;
 
     // --- 战机与技能系统 ---
-    int currentPlaneId; // 当前战机ID
+    int currentPlaneId;
 
     // 技能状态
-    bool isUltActive;     // 大招持续中 (激光/弹幕等)
-    int ultDurationTimer; // 持续时间计时
-    int ultCooldownTimer; // 冷却计时
-    int ULT_COOLDOWN_MAX; // 最大冷却 (根据飞机不同可变)
+    bool isUltActive;
+    int ultDurationTimer;
+    int ultCooldownTimer;
+    int ULT_COOLDOWN_MAX;
 
-    // 特殊状态
-    bool isShieldActive; // 护盾 (幻影号)
+    bool isShieldActive;
     int shieldTimer;
 
-    bool isTimeFrozen; // 时空冻结 (虚空号)
+    bool isTimeFrozen;
     int freezeTimer;
 };
 
