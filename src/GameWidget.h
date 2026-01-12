@@ -8,7 +8,7 @@
 #include <QTimer>
 #include <QList>
 #include <QImage>
-#include <QMovie> // 【新增】GIF支持
+#include <QMovie> // 用于播放 GIF Boss
 #include "common.h"
 #include "BossStrategy.h"
 
@@ -25,6 +25,7 @@ signals:
     void levelWon();
 
 protected:
+    // 输入事件重写
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
@@ -32,6 +33,7 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    // 内部逻辑函数
     void loadAssets();
     void updateGame();
     void spawnEnemy();
@@ -50,23 +52,23 @@ private:
     void getScaleOffset(double &scale, double &offsetX, double &offsetY);
     QPointF mapToGame(const QPoint &pos);
 
-    // 资源
+    // --- 资源变量 ---
     QImage imgHero, imgEnemy1, imgEnemy2, imgEnemy3, imgBg;
     QImage imgUltIcon;
 
-    // 音频
+    // --- 音频组件 ---
     QSoundEffect *shootSfx;
     QSoundEffect *explodeSfx;
-    QSoundEffect *ultSfx;
+    QSoundEffect *ultSfx; // 技能音效
     QMediaPlayer *bgmPlayer;
     QAudioOutput *bgmOutput;
 
-    // --- 【核心修改】BOSS 动画组件 ---
+    // --- BOSS 动画组件 ---
     QMovie *bossMovie; // 替代视频播放器
 
     QTimer *gameTimer;
 
-    // 游戏状态
+    // --- 游戏基础状态 ---
     double heroX, heroY;
     int heroHp, score;
     bool isGameOver;
@@ -74,29 +76,35 @@ private:
     QList<Bullet> bullets;
     QList<Enemy> enemies;
 
+    // --- 关卡逻辑变量 ---
     int heroShootTimer;
     LevelConfig currentLevelConfig;
     int progressCounter;
     bool bossSpawned;
     int enemySpawnTimer;
 
-    // 策略模块
+    // --- 策略模块 ---
     BossStrategy bossStrategy;
 
     // --- 战机与技能系统 ---
     int currentPlaneId;
 
-    // 技能状态
+    // 大招(Ult)状态
     bool isUltActive;
     int ultDurationTimer;
     int ultCooldownTimer;
     int ULT_COOLDOWN_MAX;
 
+    // 护盾状态 (Plane 3)
     bool isShieldActive;
     int shieldTimer;
 
+    // 时空冻结状态 (Plane 4)
     bool isTimeFrozen;
     int freezeTimer;
+
+    // 核弹全屏闪白透明度 (Plane 2)
+    int nukeFlashOpacity;
 };
 
 #endif // GAMEWIDGET_H

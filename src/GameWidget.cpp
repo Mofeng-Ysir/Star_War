@@ -18,7 +18,6 @@ GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
     setMouseTracking(true);
     loadAssets();
 
-    // 音效初始化
     shootSfx = new QSoundEffect(this);
     shootSfx->setSource(QUrl::fromLocalFile("assets/shoot.wav"));
     shootSfx->setVolume(0.3);
@@ -34,25 +33,22 @@ GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
         ultSfx->setSource(QUrl::fromLocalFile("assets/shoot.wav"));
     ultSfx->setVolume(1.0);
 
-    // BGM 初始化
     bgmPlayer = new QMediaPlayer(this);
     bgmOutput = new QAudioOutput(this);
     bgmPlayer->setAudioOutput(bgmOutput);
     bgmOutput->setVolume(0.3);
 
-    // --- 【核心修改】GIF 初始化 ---
     bossMovie = new QMovie(this);
-    bossMovie->setCacheMode(QMovie::CacheAll); // 缓存所有帧以提高性能
+    bossMovie->setCacheMode(QMovie::CacheAll);
 
-    // 定时器
     gameTimer = new QTimer(this);
     connect(gameTimer, &QTimer::timeout, this, &GameWidget::updateGame);
 
-    // 变量初始化
     enemySpawnTimer = 0;
     isShieldActive = false;
     isTimeFrozen = false;
     isUltActive = false;
+    nukeFlashOpacity = 0;
 }
 
 // 资源加载
@@ -61,7 +57,7 @@ void GameWidget::loadAssets()
     imgHero.load("assets/hero.png");
     imgEnemy1.load("assets/enemy.png");
     imgEnemy2.load("assets/enemy2.png");
-    imgEnemy3.load("assets/enemy3.png"); // 用于静态图兜底
+    imgEnemy3.load("assets/enemy3.png");
     imgBg.load("assets/game_bg.png");
     imgUltIcon.load("assets/enemy2.png");
 
@@ -75,7 +71,7 @@ void GameWidget::loadAssets()
         imgEnemy3 = imgEnemy3.scaled(120, 120, Qt::KeepAspectRatio);
 }
 
-// 分辨率适配计算
+// 分辨率适配
 void GameWidget::getScaleOffset(double &scale, double &offsetX, double &offsetY)
 {
     double w = width();
@@ -102,7 +98,6 @@ void GameWidget::startGame(int level)
     setCursor(Qt::BlankCursor);
     currentLevelConfig = LevelManager::getLevelConfig(level);
 
-    // 加载飞机数据
     currentPlaneId = DataManager::getCurrentPlaneId();
     PlaneStats stats = DataManager::getPlaneStats(currentPlaneId);
 
@@ -111,7 +106,6 @@ void GameWidget::startGame(int level)
     score = 0;
     heroHp = stats.hp;
 
-    // 换皮肤
     QString heroPath;
     if (currentPlaneId == 0)
         heroPath = "assets/hero.png";
@@ -126,7 +120,6 @@ void GameWidget::startGame(int level)
     else
         imgHero = imgHero.scaled(60, 60, Qt::KeepAspectRatio);
 
-    // 重置状态
     isGameOver = false;
     isVictory = false;
     heroShootTimer = 0;
@@ -141,17 +134,16 @@ void GameWidget::startGame(int level)
 
     isShieldActive = false;
     isTimeFrozen = false;
+    nukeFlashOpacity = 0;
 
     bossStrategy.reset();
 
     bullets.clear();
     enemies.clear();
 
-    // 停止上一局的动画
     if (bossMovie->isValid())
         bossMovie->stop();
 
-    // 播放BGM
     QString bgmPath = "assets/game_bgm.mp3";
     bgmPlayer->setSource(QUrl::fromLocalFile(bgmPath));
     bgmPlayer->setLoops(QMediaPlayer::Infinite);
@@ -165,11 +157,11 @@ void GameWidget::stopGame()
     gameTimer->stop();
     bgmPlayer->stop();
     if (bossMovie->isValid())
-        bossMovie->stop(); // 停止动画
+        bossMovie->stop();
     setCursor(Qt::ArrowCursor);
 }
 
-// 释放大招
+// 大招
 void GameWidget::fireUlt()
 {
     if (isGameOver || isVictory)
@@ -178,13 +170,13 @@ void GameWidget::fireUlt()
     if (ultCooldownTimer >= ULT_COOLDOWN_MAX && !isUltActive && !isShieldActive && !isTimeFrozen)
     {
         ultCooldownTimer = 0;
+        ultSfx->play();
 
         switch (currentPlaneId)
         {
         case PLANE_DEFAULT:
             isUltActive = true;
             ultDurationTimer = 20;
-            ultSfx->play();
             break;
         case PLANE_DOUBLE:
             for (int i = 0; i < 36; i++)
@@ -199,7 +191,6 @@ void GameWidget::fireUlt()
                 b.speedY = qSin(rad) * 12.0;
                 bullets.append(b);
             }
-            ultSfx->play();
             break;
         case PLANE_SHOTGUN:
             for (auto &b : bullets)
@@ -213,12 +204,16 @@ void GameWidget::fireUlt()
                     if (e.hp <= 0)
                     {
                         e.active = false;
-                        score += 100;
+                        int add = (e.type == 10) ? (500 * currentLevelConfig.levelId) : 100;
+                        score += add;
                         if (e.type == 10 && bossMovie->isValid())
                             bossMovie->stop();
+                        if (e.type != 10 && progressCounter < currentLevelConfig.totalWaves)
+                            progressCounter++;
                     }
                 }
             }
+            nukeFlashOpacity = 255;
             explodeSfx->play();
             break;
         case PLANE_SNIPER:
@@ -233,17 +228,27 @@ void GameWidget::fireUlt()
     }
 }
 
-// 游戏主循环
+// 主循环
 void GameWidget::updateGame()
 {
     if (isGameOver || isVictory)
         return;
 
-    // 1. 英雄普攻
+    if (nukeFlashOpacity > 0)
+    {
+        nukeFlashOpacity -= 10;
+        if (nukeFlashOpacity < 0)
+            nukeFlashOpacity = 0;
+    }
+
+    // --- 1. 英雄普攻 (射速调整) ---
     heroShootTimer++;
     int shootInterval = 12;
+
+    // 【修改点】幻影(PLANE_SNIPER/ID 3) 射速降低，恢复到普通水平 12 (之前是8)
+    // 因为现在有穿透效果，射速太快会过于变态
     if (currentPlaneId == PLANE_SNIPER)
-        shootInterval = 8;
+        shootInterval = 12;
 
     if (heroShootTimer > shootInterval)
     {
@@ -290,7 +295,7 @@ void GameWidget::updateGame()
         shootSfx->play();
     }
 
-    // 2. 技能状态
+    // --- 技能更新 ---
     if (isUltActive)
     {
         ultDurationTimer--;
@@ -315,7 +320,7 @@ void GameWidget::updateGame()
             ultCooldownTimer++;
     }
 
-    // 3. 刷怪
+    // --- 刷怪 ---
     if (!isTimeFrozen)
     {
         if (!bossSpawned)
@@ -327,7 +332,7 @@ void GameWidget::updateGame()
         }
     }
 
-    // 4. 敌人更新
+    // --- 敌人更新 ---
     for (auto &e : enemies)
     {
         if (isTimeFrozen)
@@ -335,7 +340,6 @@ void GameWidget::updateGame()
 
         if (e.type == 10)
         {
-            // BOSS 策略移动
             bossStrategy.update(e, bullets, heroX, heroY, LOGICAL_WIDTH, LOGICAL_HEIGHT, currentLevelConfig);
         }
         else
@@ -362,7 +366,7 @@ void GameWidget::updateGame()
         }
     }
 
-    // 5. 子弹更新
+    // --- 子弹更新 ---
     for (auto &b : bullets)
     {
         if (isTimeFrozen && b.isEnemy)
@@ -376,6 +380,11 @@ void GameWidget::updateGame()
             {
                 if (!e.active)
                     continue;
+                if (e.type == 10)
+                {
+                    closest = &e;
+                    break;
+                }
                 double d = qSqrt(qPow(e.x - b.x, 2) + qPow(e.y - b.y, 2));
                 if (d < minDist)
                 {
@@ -385,14 +394,13 @@ void GameWidget::updateGame()
             }
             if (closest)
             {
-                if (closest->x > b.x)
-                    b.speedX += 0.5;
-                else
-                    b.speedX -= 0.5;
-                if (b.speedX > 5)
-                    b.speedX = 5;
-                if (b.speedX < -5)
-                    b.speedX = -5;
+                double targetX = closest->x + 25;
+                double targetY = closest->y + 25;
+                double dx = targetX - b.x;
+                double dy = targetY - b.y;
+                double angle = qAtan2(dy, dx);
+                b.speedX = qCos(angle) * 15.0;
+                b.speedY = qSin(angle) * 15.0;
             }
         }
 
@@ -402,7 +410,6 @@ void GameWidget::updateGame()
             b.active = false;
     }
 
-    // 6. 碰撞检测
     checkCollisions();
 
     if (bossSpawned && enemies.isEmpty())
@@ -417,6 +424,8 @@ void GameWidget::checkCollisions()
         heroX, heroY, imgHero.width(), imgHero.height(),
         bullets, enemies,
         (currentPlaneId == PLANE_DEFAULT && isUltActive),
+        isShieldActive,
+        currentPlaneId,
         currentLevelConfig.levelId, currentLevelConfig.totalWaves,
         progressCounter, imgEnemy1, imgEnemy3);
 
@@ -427,7 +436,7 @@ void GameWidget::checkCollisions()
     if (result.bossDied)
     {
         if (bossMovie->isValid())
-            bossMovie->stop(); // Boss死了停止动画
+            bossMovie->stop();
     }
 
     if (result.heroHit)
@@ -484,14 +493,12 @@ void GameWidget::spawnEnemy()
     }
 }
 
-// 生成BOSS
 void GameWidget::spawnBoss()
 {
     if (bossSpawned)
         return;
     bossSpawned = true;
 
-    // 1. BGM
     QString bossBgmPath = QString("assets/boss%1_bgm.mp3").arg(currentLevelConfig.levelId);
     if (!QFileInfo::exists(bossBgmPath))
         bossBgmPath = "assets/game_bgm.mp3";
@@ -499,17 +506,15 @@ void GameWidget::spawnBoss()
     bgmPlayer->setSource(QUrl::fromLocalFile(bossBgmPath));
     bgmPlayer->play();
 
-    // 2. 【核心修改】加载 GIF
-    // 如果没有 gif，使用静态图片显示
     QString bossGifPath = QString("assets/boss%1.gif").arg(currentLevelConfig.levelId);
     if (QFileInfo::exists(bossGifPath))
     {
         bossMovie->setFileName(bossGifPath);
-        bossMovie->start(); // 开始播放
+        bossMovie->start();
     }
     else
     {
-        bossMovie->setFileName(""); // 清空
+        bossMovie->setFileName("");
     }
 
     Enemy boss;
@@ -525,32 +530,27 @@ void GameWidget::spawnBoss()
     enemies.append(boss);
 }
 
-// === 绘制部分 ===
+// 绘制
 void GameWidget::paintEvent(QPaintEvent *event)
 {
     QPainter p(this);
 
-    // 1. 全屏黑底
     p.fillRect(rect(), Qt::black);
 
-    // 2. 缩放
     double scale, dx, dy;
     getScaleOffset(scale, dx, dy);
     p.translate(dx, dy);
     p.scale(scale, scale);
     p.setClipRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
-    // 3. 绘制内容
     if (!imgBg.isNull())
         p.drawImage(QRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT), imgBg);
     else
         p.fillRect(QRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT), Qt::black);
 
-    // 3.1 时空冻结
     if (isTimeFrozen)
         p.fillRect(QRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT), QColor(0, 0, 255, 50));
 
-    // 3.2 激光
     if (currentPlaneId == PLANE_DEFAULT && isUltActive)
     {
         QLinearGradient gradient(heroX + imgHero.width() / 2 - 40, 0, heroX + imgHero.width() / 2 + 40, 0);
@@ -562,7 +562,6 @@ void GameWidget::paintEvent(QPaintEvent *event)
         p.drawRect(heroX + imgHero.width() / 2 - 40, 0, 80, heroY);
     }
 
-    // 3.3 英雄
     p.drawImage(heroX, heroY, imgHero);
 
     if (isShieldActive)
@@ -572,24 +571,18 @@ void GameWidget::paintEvent(QPaintEvent *event)
         p.drawEllipse(QPointF(heroX + imgHero.width() / 2, heroY + imgHero.height() / 2), 50, 50);
     }
 
-    // 3.4 敌人
     for (const auto &e : enemies)
     {
         if (e.type == 10)
         {
-            // 【核心修改】绘制 GIF 当前帧
             if (bossMovie->isValid() && bossMovie->state() == QMovie::Running)
             {
-                // 绘制大小：200x150 (可根据gif实际比例调整)
                 p.drawPixmap(QRect(e.x, e.y, 200, 150), bossMovie->currentPixmap());
             }
             else
             {
-                // GIF不存在则画静态图
                 p.drawImage(e.x, e.y, imgEnemy3);
             }
-
-            // 血条
             p.setBrush(Qt::red);
             p.drawRect(e.x, e.y - 15, 200, 8);
             p.setBrush(Qt::green);
@@ -607,7 +600,6 @@ void GameWidget::paintEvent(QPaintEvent *event)
         }
     }
 
-    // 3.5 子弹
     p.setPen(Qt::NoPen);
     for (const auto &b : bullets)
     {
@@ -618,7 +610,6 @@ void GameWidget::paintEvent(QPaintEvent *event)
         p.drawEllipse(b.x, b.y, 8, 8);
     }
 
-    // 3.6 UI
     p.setPen(Qt::white);
     p.setFont(QFont("Arial", 16, QFont::Bold));
     p.drawText(20, 40, "Level " + QString::number(currentLevelConfig.levelId));
@@ -640,6 +631,11 @@ void GameWidget::paintEvent(QPaintEvent *event)
     drawProgressBar(p);
     drawUltUI(p);
 
+    if (nukeFlashOpacity > 0)
+    {
+        p.fillRect(QRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT), QColor(255, 255, 255, nukeFlashOpacity));
+    }
+
     if (isGameOver)
     {
         p.setPen(Qt::red);
@@ -656,7 +652,7 @@ void GameWidget::paintEvent(QPaintEvent *event)
     }
 }
 
-// UI 绘制辅助
+// 辅助函数
 void GameWidget::drawProgressBar(QPainter &p)
 {
     int barWidth = 400;
@@ -724,7 +720,6 @@ void GameWidget::drawUltUI(QPainter &p)
     p.drawText(x, y + iconSize + 5, "ULTIMATE (L-Click)");
 }
 
-// 结算逻辑
 void GameWidget::gameOver()
 {
     if (!isGameOver && !isVictory)
@@ -753,16 +748,13 @@ void GameWidget::victory()
     }
 }
 
-// 输入映射
 void GameWidget::mouseMoveEvent(QMouseEvent *event)
 {
     if (isGameOver || isVictory)
         return;
-
     QPointF gamePos = mapToGame(event->pos());
     double targetX = gamePos.x() - imgHero.width() / 2;
     double targetY = gamePos.y() - imgHero.height() / 2;
-
     if (targetX < 0)
         targetX = 0;
     if (targetX > LOGICAL_WIDTH - imgHero.width())
@@ -771,7 +763,6 @@ void GameWidget::mouseMoveEvent(QMouseEvent *event)
         targetY = 0;
     if (targetY > LOGICAL_HEIGHT - imgHero.height())
         targetY = LOGICAL_HEIGHT - imgHero.height();
-
     heroX = targetX;
     heroY = targetY;
 }

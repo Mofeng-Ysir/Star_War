@@ -9,7 +9,6 @@
 class CollisionSystem
 {
 public:
-    // 返回值结构体，告诉 GameWidget 发生了什么
     struct CollisionResult
     {
         int scoreAdded;
@@ -23,7 +22,9 @@ public:
         double heroX, double heroY, int heroW, int heroH,
         QList<Bullet> &bullets,
         QList<Enemy> &enemies,
-        bool isLaserActive,
+        bool isLaserActive,  // 是否激光
+        bool isShieldActive, // 【新增】是否开盾
+        int currentPlaneId,  // 【新增】当前飞机ID (用于判断追踪弹伤害)
         int currentLevel,
         int totalWaves,
         int &progressCounter,

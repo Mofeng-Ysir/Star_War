@@ -5,6 +5,8 @@ CollisionSystem::CollisionResult CollisionSystem::check(
     QList<Bullet> &bullets,
     QList<Enemy> &enemies,
     bool isLaserActive,
+    bool isShieldActive,
+    int currentPlaneId,
     int currentLevel,
     int totalWaves,
     int &progressCounter,
@@ -16,10 +18,9 @@ CollisionSystem::CollisionResult CollisionSystem::check(
     QRect heroRect(heroX + 15, heroY + 15, heroW - 30, heroH - 30);
     QRect laserRect(heroX + heroW / 2 - 40, 0, 80, heroY);
 
-    // --- 1. 激光判定 ---
+    // --- 1. 激光 ---
     if (isLaserActive)
     {
-        // 消弹
         for (auto &b : bullets)
         {
             if (b.isEnemy && b.active && laserRect.contains(b.x, b.y))
@@ -27,7 +28,6 @@ CollisionSystem::CollisionResult CollisionSystem::check(
                 b.active = false;
             }
         }
-        // 伤敌
         for (auto &e : enemies)
         {
             if (!e.active)
@@ -48,22 +48,16 @@ CollisionSystem::CollisionResult CollisionSystem::check(
                     e.active = false;
                     if (e.type != 10 && progressCounter < totalWaves)
                         progressCounter++;
-
-                    int add = 10;
+                    int add = (e.type == 10) ? (500 * currentLevel) : (e.type == 2 ? 50 : 10);
                     if (e.type == 10)
-                    {
-                        add = 500 * currentLevel;
                         result.bossDied = true;
-                    }
-                    else if (e.type == 2)
-                        add = 50;
                     result.scoreAdded += add;
                 }
             }
         }
     }
 
-    // --- 2. 子弹判定 ---
+    // --- 2. 子弹 ---
     for (auto &b : bullets)
     {
         if (!b.active)
@@ -75,8 +69,11 @@ CollisionSystem::CollisionResult CollisionSystem::check(
             if (heroRect.intersects(bulletRect))
             {
                 b.active = false;
-                result.heroHit = true;
-                result.heroDamageTaken += 1;
+                if (!isShieldActive)
+                {
+                    result.heroHit = true;
+                    result.heroDamageTaken += 1;
+                }
             }
         }
         else
@@ -95,30 +92,30 @@ CollisionSystem::CollisionResult CollisionSystem::check(
 
                 if (enemyRect.intersects(bulletRect))
                 {
-                    b.active = false;
-                    e.hp--;
+                    // 【核心修改】幻影战机(ID=3) 子弹穿透
+                    if (currentPlaneId != 3)
+                        b.active = false;
+
+                    e.hp -= 1; // 统一伤害，靠射速或穿透打输出
+
                     if (e.hp <= 0)
                     {
                         e.active = false;
                         if (e.type != 10 && progressCounter < totalWaves)
                             progressCounter++;
-                        int add = 10;
+                        int add = (e.type == 10) ? (500 * currentLevel) : (e.type == 2 ? 50 : 10);
                         if (e.type == 10)
-                        {
-                            add = 500 * currentLevel;
                             result.bossDied = true;
-                        }
-                        else if (e.type == 2)
-                            add = 50;
                         result.scoreAdded += add;
                     }
-                    break;
+                    if (currentPlaneId != 3)
+                        break;
                 }
             }
         }
     }
 
-    // --- 3. 撞击判定 ---
+    // --- 3. 身体撞击 ---
     for (auto &e : enemies)
     {
         if (!e.active)
@@ -133,13 +130,29 @@ CollisionSystem::CollisionResult CollisionSystem::check(
 
         if (heroRect.intersects(enemyRect))
         {
-            e.active = false;
-            result.heroHit = true;
-            result.heroDamageTaken += 3;
-            if (e.type == 10)
+            if (isShieldActive)
             {
-                result.heroDamageTaken += 100; // 撞Boss直接死
-                result.bossDied = true;        // Boss也算死
+                // 【核心修改】护盾撞击伤害改为 1 (每帧)
+                e.hp -= 1;
+                if (e.hp <= 0)
+                {
+                    e.active = false;
+                    if (e.type != 10 && progressCounter < totalWaves)
+                        progressCounter++;
+                    int add = (e.type == 10) ? (500 * currentLevel) : 20;
+                    if (e.type == 10)
+                        result.bossDied = true;
+                    result.scoreAdded += add;
+                }
+            }
+            else
+            {
+                if (e.type != 10)
+                    e.active = false;
+                result.heroHit = true;
+                result.heroDamageTaken += 3;
+                if (e.type == 10)
+                    result.heroDamageTaken += 999;
             }
         }
     }
