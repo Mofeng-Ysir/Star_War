@@ -44,17 +44,19 @@ private:
     void victory();
     void cleanUp();
 
-    // --- 分辨率适配辅助 ---
-    const int LOGICAL_WIDTH = 960;
-    const int LOGICAL_HEIGHT = 600;
-    void getScaleOffset(double &scale, double &offsetX, double &offsetY);
+    // --- 分辨率适配 (动态宽度) ---
+    const int LOGICAL_HEIGHT = 600; // 基准高度固定，保证游戏速度手感一致
+    // 获取当前的逻辑宽度（随窗口变宽而变宽）
+    double getGameWidth();
+    // 获取当前的缩放比例
+    double getGameScale();
+    // 坐标映射
     QPointF mapToGame(const QPoint &pos);
 
     // 资源
     QImage imgHero, imgEnemy1, imgEnemy2, imgEnemy3, imgBg;
-    QImage imgUltIcon;
+    QImage currentBossIcon;
 
-    // 【新增】子弹图片列表
     QList<QImage> bulletImages;
 
     // 音频
@@ -101,7 +103,6 @@ private:
     bool isTimeFrozen;
     int freezeTimer;
 
-    // 核弹全屏闪白透明度
     int nukeFlashOpacity;
 };
 
