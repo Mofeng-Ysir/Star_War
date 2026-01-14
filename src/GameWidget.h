@@ -45,11 +45,16 @@ private:
     void cleanUp();
 
     // --- 分辨率适配 (动态宽度) ---
-    const int LOGICAL_HEIGHT = 600; // 基准高度固定，保证游戏速度手感一致
-    // 获取当前的逻辑宽度（随窗口变宽而变宽）
+    const int LOGICAL_HEIGHT = 600; // 基准高度固定
+
+    // 获取当前的逻辑宽度
     double getGameWidth();
     // 获取当前的缩放比例
     double getGameScale();
+
+    // 【核心修复】补上了这个函数的声明
+    void getScaleOffset(double &scale, double &offsetX, double &offsetY);
+
     // 坐标映射
     QPointF mapToGame(const QPoint &pos);
 

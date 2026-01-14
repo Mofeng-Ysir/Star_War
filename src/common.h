@@ -2,18 +2,29 @@
 #define COMMON_H
 
 #include <QString>
+#include <QRect>
+
+// --- BOSS 行为状态机 ---
+enum BossState
+{
+    STATE_NORMAL = 0, // 正常阶段：随机移动 + 普通弹幕
+    STATE_WARNING,    // 预警阶段：停止移动，显示红线/提示
+    STATE_SKILL_DASH, // 技能释放：冲刺 (Boss 1)
+    STATE_SKILL_FIRE, // 技能释放：特殊开火 (Boss 2/3...)
+    STATE_RECOVERY    // 恢复阶段：原地僵直 (输出机会)
+};
 
 // 飞机类型枚举
 enum PlaneType
 {
-    PLANE_DEFAULT = 0, // 初始机 (激光)
-    PLANE_DOUBLE = 1,  // 双子星 (双发 + 全屏弹幕)
-    PLANE_SHOTGUN = 2, // 泰坦   (散弹 + 核弹清屏)
-    PLANE_SNIPER = 3,  // 幻影   (穿透 + 无敌护盾)
-    PLANE_ALIEN = 4    // 虚空   (追踪 + 时空冻结)
+    PLANE_DEFAULT = 0,
+    PLANE_DOUBLE = 1,
+    PLANE_SHOTGUN = 2,
+    PLANE_SNIPER = 3,
+    PLANE_ALIEN = 4
 };
 
-// 飞机属性结构体
+// 飞机属性
 struct PlaneStats
 {
     int id;
@@ -22,38 +33,57 @@ struct PlaneStats
     int cost;
     int hp;
     double speed;
+    double viewAtk;
+    double viewDef;
+    double viewRate;
+    double viewHp;
 };
 
-// 子弹结构体
+// 子弹
 struct Bullet
 {
     double x, y;
     double speedX, speedY;
     bool isEnemy;
     bool active;
-    int hitCount = 0; // 【关键】穿透计数，没有这个变量会导致 CollisionSystem 报错
+    int hitCount = 0;
+    bool isSpecial = false; // 【新增】是否为特殊技能弹幕 (绘制不同外观)
 };
 
-// 敌人结构体
+// 敌人
 struct Enemy
 {
-    int type; // 0:普通, 1:射击, 2:肉盾, 10:BOSS
+    int type;
     double x, y;
     int hp;
     int maxHp;
     bool active;
+
+    // 计数器
     int shootTimer;
+    int skillTimer; // 【新增】技能流程计时器
+
+    // AI 状态
+    BossState state; // 【新增】当前状态
     double moveAngle;
     int bossId;
+
+    // 技能参数
+    bool isWarning;
+    QRect warningRect;
+    double attackTargetX; // 锁定目标X
+    double attackTargetY; // 锁定目标Y
+    double dashSpeedX;    // 【新增】冲刺速度X
+    double dashSpeedY;    // 【新增】冲刺速度Y
 };
 
-// 关卡配置结构体
+// 关卡配置
 struct LevelConfig
 {
     int levelId;
-    int totalWaves;   // 召唤BOSS前的击杀进度需求
-    int enemyHpScale; // 小怪血量倍率
-    int bossHp;       // Boss血量
+    int totalWaves;
+    int enemyHpScale;
+    int bossHp;
 };
 
 #endif // COMMON_H

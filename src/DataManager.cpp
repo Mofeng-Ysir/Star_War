@@ -7,7 +7,7 @@
 // 静态成员初始化
 int DataManager::m_coins = 0;
 int DataManager::m_currentPlaneId = 0;
-QList<bool> DataManager::m_unlockedPlanes = {true, false, false, false, false}; // 默认只解锁第1个
+QList<bool> DataManager::m_unlockedPlanes = {true, false, false, false, false};
 
 QString DataManager::getFilePath()
 {
@@ -45,7 +45,6 @@ void DataManager::saveData()
         QString mask = "";
         for (bool b : m_unlockedPlanes)
             mask += (b ? "1" : "0");
-
         out << m_coins << "|" << m_currentPlaneId << "|" << mask;
         file.close();
     }
@@ -91,62 +90,76 @@ void DataManager::unlockPlane(int id)
     }
 }
 
-// 【核心修改】这里定义了每一架飞机的具体参数和描述
+// 【核心修改】数值同步
 PlaneStats DataManager::getPlaneStats(int id)
 {
     PlaneStats s;
     s.id = id;
     switch (id)
     {
-    case 0:
-        s.name = "勇者号 (Voyager)";
+    case 0: // 1号: 初始机
+        s.name = "勇者号";
         s.cost = 0;
-        s.hp = 10;
-        s.speed = 1.0;
-        s.desc = "【新手推荐】\n"
-                 "普攻：标准单发光束\n"
-                 "大招：<font color='#00FFFF'>毁灭激光</font> (持续高伤，消除弹幕)";
+        s.viewAtk = 1.0;
+        s.viewDef = 1.0;
+        s.viewRate = 1.0;
+        s.viewHp = 1.0;
+        s.hp = 10;     // 实际血量 = 1 * 10
+        s.speed = 1.0; // 移动速度标准
+        s.desc = "标准型战机，各项指标均衡。";
         break;
-    case 1:
-        s.name = "双子星 (Gemini)";
-        s.cost = 500;
-        s.hp = 12;
-        s.speed = 1.2;
-        s.desc = "【火力覆盖】\n"
-                 "普攻：双管齐射，射速中等\n"
-                 "大招：<font color='#FF00FF'>弹幕风暴</font> (全屏无死角散射)";
+
+    case 1: // 2号: 双子星
+        s.name = "双子星";
+        s.cost = 1000;
+        s.viewAtk = 3.0;
+        s.viewDef = 2.0;
+        s.viewRate = 3.0;
+        s.viewHp = 3.0;
+        s.hp = 30;     // 实际血量 = 3 * 10
+        s.speed = 1.2; // 速度稍快
+        s.desc = "高射速双发战机，火力压制。";
         break;
-    case 2:
-        s.name = "泰坦 (Titan)";
-        s.cost = 1500;
-        s.hp = 20;
-        s.speed = 0.8;
-        s.desc = "【重装坦克】\n"
-                 "普攻：三向霰弹，近身伤害极高\n"
-                 "大招：<font color='#FFAA00'>战术核弹</font> (清屏秒杀，瞬间巨额伤害)";
-        break;
-    case 3:
-        s.name = "幻影 (Phantom)";
+
+    case 2: // 3号: 泰坦
+        s.name = "泰坦";
         s.cost = 3000;
-        s.hp = 8;
-        s.speed = 1.5;
-        s.desc = "【极速突袭】\n"
-                 "普攻：高速穿透弹，射速极快\n"
-                 "大招：<font color='#00FF00'>绝对领域</font> (开启5秒无敌护盾)";
+        s.viewAtk = 4.0;
+        s.viewDef = 5.0;
+        s.viewRate = 2.0;
+        s.viewHp = 6.0;
+        s.hp = 60;     // 实际血量 = 6 * 10
+        s.speed = 0.7; // 速度慢，笨重
+        s.desc = "重装甲霰弹战机，防御力极强。";
         break;
-    case 4:
-        s.name = "虚空 (Void)";
-        s.cost = 8000;
-        s.hp = 10;
-        s.speed = 1.0;
-        s.desc = "【神秘科技】\n"
-                 "普攻：自动追踪导弹，必中\n"
-                 "大招：<font color='#0000FF'>时空冻结</font> (暂停所有敌人和子弹5秒)";
+
+    case 3: // 4号: 幻影
+        s.name = "幻影";
+        s.cost = 6000;
+        s.viewAtk = 4.0;
+        s.viewDef = 4.0;
+        s.viewRate = 2.0;
+        s.viewHp = 5.0;
+        s.hp = 50;     // 实际血量 = 5 * 10
+        s.speed = 1.3; // 速度快
+        s.desc = "搭载穿透弹与护盾系统。";
         break;
+
+    case 4: // 5号: 虚空
+        s.name = "虚空";
+        s.cost = 10000;
+        s.viewAtk = 5.0;
+        s.viewDef = 4.0;
+        s.viewRate = 2.5;
+        s.viewHp = 8.0;
+        s.hp = 80;     // 实际血量 = 8 * 10
+        s.speed = 1.0; // 标准速度
+        s.desc = "搭载高伤追踪导弹与时空科技。";
+        break;
+
     default:
-        s.name = "未知机型";
+        s.name = "未知";
         s.cost = 99999;
-        s.desc = "数据丢失...";
         break;
     }
     return s;

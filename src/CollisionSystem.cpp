@@ -18,7 +18,7 @@ CollisionSystem::CollisionResult CollisionSystem::check(
     QRect heroRect(heroX + 15, heroY + 15, heroW - 30, heroH - 30);
     QRect laserRect(heroX + heroW / 2 - 40, 0, 80, heroY);
 
-    // --- 1. 激光 ---
+    // --- 1. 激光判定 ---
     if (isLaserActive)
     {
         for (auto &b : bullets)
@@ -57,7 +57,7 @@ CollisionSystem::CollisionResult CollisionSystem::check(
         }
     }
 
-    // --- 2. 子弹 ---
+    // --- 2. 子弹判定 (数值同步) ---
     for (auto &b : bullets)
     {
         if (!b.active)
@@ -92,11 +92,31 @@ CollisionSystem::CollisionResult CollisionSystem::check(
 
                 if (enemyRect.intersects(bulletRect))
                 {
-                    // 【核心修改】幻影战机(ID=3) 子弹穿透
+                    // 幻影(ID 3) 穿透
                     if (currentPlaneId != 3)
                         b.active = false;
 
-                    e.hp -= 1; // 统一伤害，靠射速或穿透打输出
+                    // 【核心修改】根据 ID 设定伤害
+                    int damage = 1;
+                    switch (currentPlaneId)
+                    {
+                    case 0:
+                        damage = 1;
+                        break; // 勇者
+                    case 1:
+                        damage = 2;
+                        break; // 双子 (2颗x2伤 = 4? 其实双子强在覆盖面)
+                    case 2:
+                        damage = 3;
+                        break; // 泰坦 (3颗x3伤)
+                    case 3:
+                        damage = 4;
+                        break; // 幻影 (面板写4)
+                    case 4:
+                        damage = 5;
+                        break; // 虚空 (面板写5)
+                    }
+                    e.hp -= damage;
 
                     if (e.hp <= 0)
                     {
@@ -132,8 +152,7 @@ CollisionSystem::CollisionResult CollisionSystem::check(
         {
             if (isShieldActive)
             {
-                // 【核心修改】护盾撞击伤害改为 1 (每帧)
-                e.hp -= 1;
+                e.hp -= 1; // 护盾撞击只扣1
                 if (e.hp <= 0)
                 {
                     e.active = false;

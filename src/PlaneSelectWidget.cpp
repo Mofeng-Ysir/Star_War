@@ -6,8 +6,8 @@
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QDebug>
-#include <QScrollArea> // 新增
-#include <QScrollBar>  // 新增
+#include <QScrollArea>
+#include <QScrollBar>
 
 PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
 {
@@ -17,7 +17,7 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(50, 20, 50, 20);
 
-    // 1. 顶部：标题 + 金币
+    // 1. 顶部
     QHBoxLayout *topLayout = new QHBoxLayout();
     QLabel *title = new QLabel("机库 HANGAR");
     title->setStyleSheet("color: white; font-size: 40px; font-weight: bold; font-family: 'Microsoft YaHei';");
@@ -28,9 +28,9 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
     topLayout->addWidget(coinLabel);
     mainLayout->addLayout(topLayout);
 
-    mainLayout->addSpacing(30);
+    mainLayout->addSpacing(20);
 
-    // 2. 中间：飞机列表 (图标按钮)
+    // 2. 飞机列表
     QHBoxLayout *planesLayout = new QHBoxLayout();
     planesLayout->setSpacing(20);
 
@@ -43,11 +43,8 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
         QString imgPath = QString("assets/plane%1.png").arg(i);
         if (i == 0)
             imgPath = "assets/hero.png";
-
         if (!QFileInfo::exists(imgPath))
-        {
             imgPath = "assets/hero.png";
-        }
 
         btn->setIcon(QIcon(imgPath));
         btn->setIconSize(QSize(80, 80));
@@ -61,59 +58,30 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
     mainLayout->addLayout(planesLayout);
     mainLayout->addSpacing(30);
 
-    // 3. 下方：详情信息框 (带滚动条) --- 【核心修改区域】 ---
-
+    // 3. 详情框 (带滚动)
     QScrollArea *infoScroll = new QScrollArea(this);
-    infoScroll->setWidgetResizable(true); // 让内部的 label 自动撑满宽度
-    infoScroll->setFixedHeight(220);      // 固定滚动区域的高度
+    infoScroll->setWidgetResizable(true);
+    infoScroll->setFixedHeight(260); // 稍微加高以容纳进度条
 
-    // 设置滚动区域样式 (边框、背景、滚动条美化)
     infoScroll->setStyleSheet(R"(
-        QScrollArea {
-            border: 2px solid #00AAFF;
-            background-color: rgba(0, 20, 40, 200);
-            border-radius: 15px;
-        }
-        /* 隐藏边框线 */
+        QScrollArea { border: 2px solid #00AAFF; background-color: rgba(0, 20, 40, 200); border-radius: 15px; }
         QScrollArea > QWidget > QWidget { background: transparent; }
-        
-        /* 垂直滚动条美化 */
-        QScrollBar:vertical {
-            border: none;
-            background: rgba(0,0,0,50);
-            width: 12px;
-            margin: 10px 0 10px 0;
-            border-radius: 6px;
-        }
-        QScrollBar::handle:vertical {
-            background: #00AAFF;
-            min-height: 20px;
-            border-radius: 6px;
-        }
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-            height: 0px;
-        }
+        QScrollBar:vertical { border: none; background: rgba(0,0,0,50); width: 12px; margin: 10px 0; border-radius: 6px; }
+        QScrollBar::handle:vertical { background: #00AAFF; min-height: 20px; border-radius: 6px; }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
     )");
 
-    // 初始化 infoLabel
     infoLabel = new QLabel("详情加载中...");
     infoLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    infoLabel->setWordWrap(true); // 必须开启自动换行
+    infoLabel->setWordWrap(true);
+    infoLabel->setStyleSheet("color: #EEE; font-size: 20px; padding: 15px; background: transparent; border: none;");
 
-    // label 本身背景透明，字体样式在这里设置
-    infoLabel->setStyleSheet("color: #EEE; font-size: 22px; padding: 15px; background: transparent; border: none;");
-
-    // 将 label 放入滚动区域
     infoScroll->setWidget(infoLabel);
-
-    // 将滚动区域加入布局
     mainLayout->addWidget(infoScroll);
-
-    // ----------------------------------------------------
 
     mainLayout->addSpacing(20);
 
-    // 4. 底部：动作按钮区域
+    // 4. 底部按钮
     QHBoxLayout *actionLayout = new QHBoxLayout();
 
     QPushButton *btnBack = new QPushButton("返回主菜单");
@@ -165,23 +133,14 @@ void PlaneSelectWidget::refreshUI()
     {
         bool unlocked = DataManager::isPlaneUnlocked(i);
         QString style = "border-radius: 10px; ";
-
         if (i == currentId)
-        {
             style += "background-color: rgba(0, 255, 0, 50); border: 4px solid #00FF00;";
-        }
         else if (i == selectedPreviewId)
-        {
             style += "background-color: rgba(255, 255, 255, 30); border: 4px solid #FFFFFF;";
-        }
         else if (unlocked)
-        {
             style += "background-color: rgba(0, 0, 0, 150); border: 2px solid #888;";
-        }
         else
-        {
             style += "background-color: rgba(50, 0, 0, 200); border: 2px solid #500;";
-        }
         planeBtns[i]->setStyleSheet(style);
     }
 
@@ -200,19 +159,78 @@ void PlaneSelectWidget::refreshUI()
         statusText = "<span style='color:#FF4444; font-weight:bold;'>[ 未解锁 ]</span>";
     }
 
+    // --- 核心修改：生成条形图 HTML ---
+    // 辅助 Lambda：生成一个进度条的 HTML 字符串
+    // val: 当前值, max: 最大值, color: 颜色
+    auto makeBar = [](double val, double max, QString color) -> QString
+    {
+        int width = (int)((val / max) * 150); // 进度条总长 150px
+        if (width > 150)
+            width = 150;
+        // 使用 table 来模拟进度条，背景深灰，前景彩色
+        return QString(
+                   "<table width='150' border='0' cellspacing='0' cellpadding='0' bgcolor='#333333'>"
+                   "<tr><td width='%1' bgcolor='%2' height='8'></td>"
+                   "<td></td></tr></table>")
+            .arg(width)
+            .arg(color);
+    };
+
+    // 定义各项属性的最大值 (用于计算比例)
+    const double MAX_ATK = 5.0;
+    const double MAX_DEF = 5.0;
+    const double MAX_SPD = 3.0; // 射速
+    const double MAX_HP = 8.0;
+
     QString html = QString(
                        "<div>"
-                       "   <span style='font-size:32px; font-weight:bold; color:#FFF;'>%1</span> &nbsp;&nbsp; %2<br>"
-                       "   <span style='color:#888;'>----------------------------------------</span><br>"
-                       "   <span style='font-size:24px;'>售价: <span style='color:#FFD700;'>%3</span> 战利品</span><br>"
-                       "   生命值: <span style='color:#00FF00;'>%4</span> &nbsp;|&nbsp; 机动性: <span style='color:#00FFFF;'>%5</span><br><br>"
-                       "   <span style='font-size:20px; line-height:150%;'>%6</span>"
+                       "   <table width='100%'>"
+                       "   <tr>"
+                       "       <td colspan='2'><span style='font-size:32px; font-weight:bold; color:#FFF;'>%1</span> &nbsp; %2</td>"
+                       "   </tr>"
+                       "   <tr><td colspan='2'><hr></td></tr>"
+
+                       // 第一行：攻击 & 防御
+                       "   <tr>"
+                       "       <td width='50%'>"
+                       "           <span style='font-size:18px; color:#AAA;'>攻击火力: </span><span style='font-size:22px; color:#FF4444; font-weight:bold;'>%3</span><br>"
+                       "           %4" // 攻击条
+                       "       </td>"
+                       "       <td width='50%'>"
+                       "           <span style='font-size:18px; color:#AAA;'>装甲防御: </span><span style='font-size:22px; color:#4444FF; font-weight:bold;'>%5</span><br>"
+                       "           %6" // 防御条
+                       "       </td>"
+                       "   </tr>"
+                       "   <tr><td colspan='2' height='10'></td></tr>" // 空行间距
+
+                       // 第二行：射速 & 耐久
+                       "   <tr>"
+                       "       <td>"
+                       "           <span style='font-size:18px; color:#AAA;'>武器射速: </span><span style='font-size:22px; color:#FFFF00; font-weight:bold;'>%7</span><br>"
+                       "           %8" // 射速条
+                       "       </td>"
+                       "       <td>"
+                       "           <span style='font-size:18px; color:#AAA;'>舰体耐久: </span><span style='font-size:22px; color:#00FF00; font-weight:bold;'>%9</span><br>"
+                       "           %10" // 耐久条
+                       "       </td>"
+                       "   </tr>"
+                       "   </table>"
+
+                       "<br>"
+                       "   <span style='font-size:22px; color:gold;'>售价: %11</span><br>"
+                       "   <span style='font-size:18px; color:#DDD;'>%12</span>"
                        "</div>")
                        .arg(s.name)
                        .arg(statusText)
+                       .arg(s.viewAtk)
+                       .arg(makeBar(s.viewAtk, MAX_ATK, "#FF4444"))
+                       .arg(s.viewDef)
+                       .arg(makeBar(s.viewDef, MAX_DEF, "#4444FF"))
+                       .arg(s.viewRate)
+                       .arg(makeBar(s.viewRate, MAX_SPD, "#FFFF00"))
+                       .arg(s.viewHp)
+                       .arg(makeBar(s.viewHp, MAX_HP, "#00FF00"))
                        .arg(s.cost)
-                       .arg(s.hp)
-                       .arg(s.speed)
                        .arg(s.desc.replace("\n", "<br>"));
 
     infoLabel->setText(html);
@@ -234,7 +252,7 @@ void PlaneSelectWidget::refreshUI()
     }
     else
     {
-        actionBtn->setText("购买 (" + QString::number(s.cost) + ")");
+        actionBtn->setText("购买");
         actionBtn->setEnabled(true);
         if (DataManager::getCoins() >= s.cost)
         {
