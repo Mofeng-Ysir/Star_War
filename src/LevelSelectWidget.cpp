@@ -13,7 +13,7 @@ LevelSelectWidget::LevelSelectWidget(QWidget *parent) : QWidget(parent)
     mainLayout->setAlignment(Qt::AlignCenter);
 
     QLabel *title = new QLabel("选择关卡");
-    title->setStyleSheet("color: white; font-size: 48px; font-weight: bold;");
+    title->setStyleSheet("color: white; font-size: 48px; font-weight: bold; font-family: 'Microsoft YaHei';");
     title->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(title);
     mainLayout->addSpacing(50);
@@ -21,10 +21,27 @@ LevelSelectWidget::LevelSelectWidget(QWidget *parent) : QWidget(parent)
     QHBoxLayout *levelsLayout = new QHBoxLayout();
     levelsLayout->setSpacing(20);
 
-    for (int i = 1; i <= 5; ++i)
+    // 【核心修改】循环增加到 6
+    for (int i = 1; i <= 6; ++i)
     {
         QPushButton *btn = new QPushButton(QString::number(i));
         btn->setFixedSize(80, 80);
+
+        // 第6关特殊样式（可选）
+        if (i == 6)
+        {
+            btn->setText("FINAL");
+            btn->setStyleSheet(R"(
+                QPushButton { 
+                    background-color: rgba(255, 0, 0, 150); 
+                    color: white; font-size: 18px; font-weight: bold;
+                    border: 2px solid #FF0000; border-radius: 40px; 
+                } 
+                QPushButton:hover { background-color: #FF0000; }
+                QPushButton:disabled { background-color: rgba(50, 50, 50, 150); border: 2px solid #555; }
+            )");
+        }
+
         connect(btn, &QPushButton::clicked, [this, i]()
                 { emit levelSelected(i); });
         levelBtns.append(btn);
@@ -42,17 +59,26 @@ LevelSelectWidget::LevelSelectWidget(QWidget *parent) : QWidget(parent)
 void LevelSelectWidget::refreshState()
 {
     int maxLevel = LevelManager::getMaxUnlockedLevel();
-    for (int i = 0; i < 5; ++i)
+    // 【核心修改】循环增加到 6
+    for (int i = 0; i < 6; ++i)
     {
         if ((i + 1) <= maxLevel)
         {
             levelBtns[i]->setEnabled(true);
-            levelBtns[i]->setStyleSheet("QPushButton { background-color: rgba(0, 170, 255, 100); color: white; font-size: 32px; border: 2px solid #00AAFF; border-radius: 40px; } QPushButton:hover { background-color: #00AAFF; }");
+            // 恢复普通关卡样式
+            if (i != 5)
+            {
+                levelBtns[i]->setStyleSheet("QPushButton { background-color: rgba(0, 170, 255, 100); color: white; font-size: 32px; border: 2px solid #00AAFF; border-radius: 40px; } QPushButton:hover { background-color: #00AAFF; }");
+            }
         }
         else
         {
             levelBtns[i]->setEnabled(false);
-            levelBtns[i]->setStyleSheet("QPushButton { background-color: rgba(50, 50, 50, 150); color: #888; font-size: 32px; border: 2px solid #555; border-radius: 40px; }");
+            // 统一的禁用样式
+            if (i != 5)
+            {
+                levelBtns[i]->setStyleSheet("QPushButton { background-color: rgba(50, 50, 50, 150); color: #888; font-size: 32px; border: 2px solid #555; border-radius: 40px; }");
+            }
         }
     }
 }

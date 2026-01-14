@@ -42,7 +42,7 @@ MenuWidget::MenuWidget(QWidget *parent) : QWidget(parent)
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->addStretch();
 
-    QLabel *title = new QLabel("星际飞机大战");
+    QLabel *title = new QLabel("星际大战");
     title->setStyleSheet("QLabel { color: #00FFFF; font-size: 64px; font-weight: bold; background: transparent; }");
     title->setAlignment(Qt::AlignCenter);
     title->setGraphicsEffect(new QGraphicsDropShadowEffect(this));
