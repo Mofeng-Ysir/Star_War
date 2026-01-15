@@ -77,6 +77,39 @@ struct Enemy
     double dashSpeedY;    // 【新增】冲刺速度Y
 };
 
+// --- 【新增】装备系统定义 ---
+
+enum EquipTier
+{
+    TIER_COMMON = 0, // 普通 (白色)
+    TIER_RARE = 1,   // 优良 (蓝色)
+    TIER_EPIC = 2    // 极品 (紫色)
+};
+
+enum EquipType
+{
+    TYPE_CORE = 0,  // 核心 (加攻击)
+    TYPE_ARMOR = 1, // 装甲 (加血量/防御)
+    TYPE_ENGINE = 2 // 引擎 (加射速/移速)
+};
+
+struct Equipment
+{
+    int id;         // 唯一ID
+    QString name;   // 名称
+    EquipType type; // 部位
+    EquipTier tier; // 品质
+    int cost;       // 商店售价
+
+    // 增益属性
+    int hpBonus;      // 血量加成
+    double atkBonus;  // 攻击力加成 (子弹伤害)
+    double spdBonus;  // 移速加成
+    double rateBonus; // 射速加成 (百分比，如 0.1 代表射速快10%)
+
+    QString desc; // 描述
+};
+
 // 关卡配置
 struct LevelConfig
 {

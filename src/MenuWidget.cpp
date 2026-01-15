@@ -1,5 +1,6 @@
 #include "MenuWidget.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QGraphicsDropShadowEffect>
@@ -7,9 +8,11 @@
 #include <QPainter>
 #include <QFileInfo>
 #include <QUrl>
+#include <QMovie> // 确保包含 QMovie
 
 MenuWidget::MenuWidget(QWidget *parent) : QWidget(parent)
 {
+    // --- 视频背景 ---
     player = new QMediaPlayer(this);
     audioOutput = new QAudioOutput(this);
     player->setAudioOutput(audioOutput);
@@ -29,6 +32,7 @@ MenuWidget::MenuWidget(QWidget *parent) : QWidget(parent)
         audioOutput->setVolume(0);
     }
 
+    // --- 菜单背景音乐 ---
     menuBgmPlayer = new QMediaPlayer(this);
     menuBgmOutput = new QAudioOutput(this);
     menuBgmPlayer->setAudioOutput(menuBgmOutput);
@@ -39,64 +43,111 @@ MenuWidget::MenuWidget(QWidget *parent) : QWidget(parent)
         menuBgmOutput->setVolume(0.5);
     }
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->addStretch();
+    // --- UI 布局 ---
+    QVBoxLayout *mainVLayout = new QVBoxLayout(this);
+    mainVLayout->setContentsMargins(0, 0, 0, 0);
+    mainVLayout->setSpacing(0);
 
-    QLabel *title = new QLabel("星际大战");
-    title->setStyleSheet("QLabel { color: #00FFFF; font-size: 64px; font-weight: bold; background: transparent; }");
+    // 添加顶部留白
+    mainVLayout->addStretch(1);
+
+    // 中央内容面板
+    QWidget *centerPanel = new QWidget;
+    centerPanel->setStyleSheet("background-color: rgba(0, 0, 0, 140); border-radius: 20px;");
+    centerPanel->setMaximumWidth(700);
+
+    QVBoxLayout *centerLayout = new QVBoxLayout(centerPanel);
+    centerLayout->setContentsMargins(50, 60, 50, 60);
+    centerLayout->setSpacing(15);
+
+    // 标题
+    QLabel *title = new QLabel("⭐ 星际战机 ⭐\nULTIMATE EDITION");
+    title->setStyleSheet("color: #00FFFF; font-size: 52px; font-weight: bold; font-family: 'Microsoft YaHei';");
     title->setAlignment(Qt::AlignCenter);
-    title->setGraphicsEffect(new QGraphicsDropShadowEffect(this));
-    mainLayout->addWidget(title);
+    // 标题阴影
+    QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect(this);
+    shadow->setBlurRadius(15);
+    shadow->setColor(Qt::cyan);
+    shadow->setOffset(0, 0);
+    title->setGraphicsEffect(shadow);
+    centerLayout->addWidget(title);
+    centerLayout->addSpacing(20);
 
-    mainLayout->addSpacing(60);
+    // 副标题
+    QLabel *subtitle = new QLabel("准备好征服太空了吗？");
+    subtitle->setStyleSheet("color: #AAAAFF; font-size: 18px; font-family: 'Microsoft YaHei';");
+    subtitle->setAlignment(Qt::AlignCenter);
+    centerLayout->addWidget(subtitle);
+    centerLayout->addSpacing(30);
 
+    // 按钮样式 - 更现代的设计
     QString btnStyle = R"(
         QPushButton {
-            background-color: rgba(0, 0, 0, 180); color: white; font-size: 24px;
-            border: 2px solid #00AAFF; border-radius: 15px; padding: 12px; min-width: 240px;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 170, 255, 80), stop:1 rgba(0, 100, 200, 100));
+            color: white; 
+            font-size: 20px; 
+            font-weight: bold;
+            border: 2px solid #00AAFF; 
+            border-radius: 15px; 
+            padding: 18px;
+            min-height: 65px;
+            margin: 10px 0px;
         }
-        QPushButton:hover { background-color: rgba(0, 170, 255, 150); border-color: white; }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 200, 255, 150), stop:1 rgba(0, 150, 255, 180));
+            border-color: #00FFFF;
+            color: #FFFFFF;
+        }
+        QPushButton:pressed {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 100, 200, 200), stop:1 rgba(0, 50, 150, 200));
+        }
     )";
 
-    QPushButton *btnStart = new QPushButton("开始游戏");
-    btnStart->setStyleSheet(btnStyle);
-    btnStart->setCursor(Qt::PointingHandCursor);
-    connect(btnStart, &QPushButton::clicked, this, &MenuWidget::startClicked);
+    // 辅助函数创建按钮，统一设置样式和连接信号
+    auto createBtn = [&](QString text, auto receiver, auto slot)
+    {
+        QPushButton *btn = new QPushButton(text);
+        btn->setStyleSheet(btnStyle);
+        btn->setCursor(Qt::PointingHandCursor);
+        connect(btn, &QPushButton::clicked, receiver, slot);
+        centerLayout->addWidget(btn);
+    };
 
-    // 【新增】战机中心按钮
-    QPushButton *btnGarage = new QPushButton("战机中心");
-    btnGarage->setStyleSheet(btnStyle);
-    btnGarage->setCursor(Qt::PointingHandCursor);
-    connect(btnGarage, &QPushButton::clicked, this, &MenuWidget::garageClicked);
+    // 添加菜单项
+    createBtn("🚀  开始任务  MISSION", this, &MenuWidget::startClicked);
+    createBtn("🛸  机库中心  HANGAR", this, &MenuWidget::garageClicked);
+    createBtn("🛡️  装备配置  EQUIP", this, &MenuWidget::equipClicked);
+    createBtn("🛒  补给商店  SHOP", this, &MenuWidget::shopClicked);
+    createBtn("🏆  荣誉殿堂  RANK", this, &MenuWidget::historyClicked);
 
-    QPushButton *btnHistory = new QPushButton("历史记录");
-    btnHistory->setStyleSheet(btnStyle);
-    btnHistory->setCursor(Qt::PointingHandCursor);
-    connect(btnHistory, &QPushButton::clicked, this, &MenuWidget::historyClicked);
+    centerLayout->addSpacing(20);
 
-    QPushButton *btnExit = new QPushButton("退出游戏");
-    btnExit->setStyleSheet(btnStyle);
-    btnExit->setCursor(Qt::PointingHandCursor);
-    connect(btnExit, &QPushButton::clicked, qApp, &QApplication::quit);
+    createBtn("❌  退出游戏  EXIT", qApp, &QApplication::quit);
 
-    QVBoxLayout *btnLayout = new QVBoxLayout();
-    btnLayout->setAlignment(Qt::AlignCenter);
-    btnLayout->addWidget(btnStart);
-    btnLayout->addWidget(btnGarage); // 加入布局
-    btnLayout->addWidget(btnHistory);
-    btnLayout->addWidget(btnExit);
+    // 将中央面板添加到主布局
+    QHBoxLayout *mainHLayout = new QHBoxLayout;
+    mainHLayout->setContentsMargins(0, 0, 0, 0);
+    mainHLayout->addStretch();
+    mainHLayout->addWidget(centerPanel);
+    mainHLayout->addStretch();
 
-    mainLayout->addLayout(btnLayout);
-    mainLayout->addStretch();
+    centerLayout->addStretch();
+
+    mainVLayout->addLayout(mainHLayout, 1);
+    mainVLayout->addStretch(1);
 }
 
 void MenuWidget::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
     if (currentVideoFrame.isValid())
+    {
         p.drawImage(rect(), currentVideoFrame.toImage());
+    }
     else
-        p.fillRect(rect(), Qt::black);
+    {
+        p.fillRect(rect(), Qt::black); // 视频加载失败则黑屏
+    }
 }
 
 void MenuWidget::startMenu()
@@ -109,5 +160,6 @@ void MenuWidget::startMenu()
 void MenuWidget::stopMenu()
 {
     player->pause();
-    menuBgmPlayer->stop();
+    if (menuBgmPlayer->source().isValid())
+        menuBgmPlayer->stop();
 }

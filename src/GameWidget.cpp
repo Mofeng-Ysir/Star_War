@@ -13,6 +13,7 @@
 #include <QLinearGradient>
 #include <QRadialGradient>
 #include <QTime>
+#include <QMessageBox>
 
 // ================= 构造函数 =================
 GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
@@ -20,7 +21,7 @@ GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
     setMouseTracking(true);
     loadAssets();
 
-    // 音效初始化
+    // --- 音效初始化 ---
     shootSfx = new QSoundEffect(this);
     shootSfx->setSource(QUrl::fromLocalFile("assets/shoot.wav"));
     shootSfx->setVolume(0.3);
@@ -29,13 +30,15 @@ GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
     explodeSfx->setSource(QUrl::fromLocalFile("assets/explode.wav"));
     explodeSfx->setVolume(0.6);
 
-    // 【核心修改】加载5个专属技能音效
+    // 【核心修复】移除旧的 ultSfx，改为加载列表 ultSfxList
     ultSfxList.clear();
     for (int i = 0; i < 5; ++i)
     {
         QSoundEffect *sfx = new QSoundEffect(this);
+        // 尝试加载 assets/ult0.wav ~ ult4.wav
         QString path = QString("assets/ult%1.wav").arg(i);
-        // 兜底：如果没有专属音效，用 laser.wav 或 shoot.wav
+
+        // 兜底逻辑：如果找不到专属音效，就用 laser.wav 或 shoot.wav
         if (!QFileInfo::exists(path))
         {
             if (QFileInfo::exists("assets/laser.wav"))
@@ -43,26 +46,27 @@ GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
             else
                 path = "assets/shoot.wav";
         }
+
         sfx->setSource(QUrl::fromLocalFile(path));
         sfx->setVolume(1.0);
         ultSfxList.append(sfx);
     }
 
-    // BGM 初始化
+    // --- BGM 初始化 ---
     bgmPlayer = new QMediaPlayer(this);
     bgmOutput = new QAudioOutput(this);
     bgmPlayer->setAudioOutput(bgmOutput);
     bgmOutput->setVolume(0.3);
 
-    // BOSS 动画初始化
+    // --- BOSS 动画初始化 ---
     bossMovie = new QMovie(this);
     bossMovie->setCacheMode(QMovie::CacheAll);
 
-    // 定时器
+    // --- 定时器 ---
     gameTimer = new QTimer(this);
     connect(gameTimer, &QTimer::timeout, this, &GameWidget::updateGame);
 
-    // 变量初始化
+    // --- 变量初始化 ---
     enemySpawnTimer = 0;
     isShieldActive = false;
     isTimeFrozen = false;
@@ -102,7 +106,7 @@ void GameWidget::loadAssets()
     }
 }
 
-// ================= 分辨率适配 =================
+// ================= 分辨率适配辅助 =================
 double GameWidget::getGameScale()
 {
     return height() / (double)LOGICAL_HEIGHT;
@@ -134,7 +138,7 @@ void GameWidget::startGame(int level)
 
     // 加载战机
     currentPlaneId = DataManager::getCurrentPlaneId();
-    PlaneStats stats = DataManager::getPlaneStats(currentPlaneId);
+    PlaneStats stats = DataManager::getFinalStats(currentPlaneId); // 使用最终数值
 
     heroX = getGameWidth() / 2 - 30;
     heroY = LOGICAL_HEIGHT - 100;
@@ -205,7 +209,7 @@ void GameWidget::stopGame()
     setCursor(Qt::ArrowCursor);
 }
 
-// ================= 大招逻辑 (核心修复) =================
+// ================= 大招逻辑 =================
 void GameWidget::fireUlt()
 {
     if (isGameOver || isVictory)
@@ -215,7 +219,7 @@ void GameWidget::fireUlt()
     {
         ultCooldownTimer = 0;
 
-        // 【新增】播放对应战机的技能音效
+        // 【核心修复】播放对应音效
         if (currentPlaneId >= 0 && currentPlaneId < ultSfxList.size())
         {
             ultSfxList[currentPlaneId]->play();
@@ -227,11 +231,9 @@ void GameWidget::fireUlt()
             isUltActive = true;
             ultDurationTimer = 20;
             break;
-
         case PLANE_DOUBLE:
             for (int i = 0; i < 36; i++)
             {
-                // 【修复】之前这里少了 Bullet b; 的定义
                 Bullet b;
                 b.x = heroX + imgHero.width() / 2;
                 b.y = heroY;
@@ -243,7 +245,6 @@ void GameWidget::fireUlt()
                 bullets.append(b);
             }
             break;
-
         case PLANE_SHOTGUN:
             for (auto &b : bullets)
                 if (b.isEnemy)
@@ -266,14 +267,12 @@ void GameWidget::fireUlt()
                 }
             }
             nukeFlashOpacity = 255;
-            explodeSfx->play();
+            // explodeSfx->play(); // 音效已在上面统一播放
             break;
-
         case PLANE_SNIPER:
             isShieldActive = true;
             shieldTimer = 300;
             break;
-
         case PLANE_ALIEN:
             isTimeFrozen = true;
             freezeTimer = 300;
@@ -295,10 +294,10 @@ void GameWidget::updateGame()
             nukeFlashOpacity = 0;
     }
 
-    // 1. 英雄普攻
+    // 1. 英雄普攻 (射速同步)
     heroShootTimer++;
-    PlaneStats stats = DataManager::getPlaneStats(currentPlaneId);
-    int shootInterval = 12 / stats.viewRate;
+    PlaneStats stats = DataManager::getFinalStats(currentPlaneId);
+    int shootInterval = (int)(12.0 / stats.viewRate);
     if (shootInterval < 3)
         shootInterval = 3;
 
@@ -502,7 +501,7 @@ void GameWidget::checkCollisions()
     }
 }
 
-// ================= 生成逻辑 =================
+// 刷怪辅助
 void GameWidget::spawnEnemy()
 {
     enemySpawnTimer++;
@@ -604,11 +603,10 @@ void GameWidget::paintEvent(QPaintEvent *event)
     p.scale(scale, scale);
     p.setClipRect(0, 0, (int)gameW, LOGICAL_HEIGHT);
 
-    // 3. 绘制游戏内容
+    // 3. 游戏内容
     if (isTimeFrozen)
         p.fillRect(QRect(0, 0, (int)gameW, LOGICAL_HEIGHT), QColor(0, 0, 255, 50));
 
-    // 激光
     if (currentPlaneId == PLANE_DEFAULT && isUltActive)
     {
         QLinearGradient gradient(heroX + imgHero.width() / 2 - 40, 0, heroX + imgHero.width() / 2 + 40, 0);
@@ -629,12 +627,11 @@ void GameWidget::paintEvent(QPaintEvent *event)
         p.drawEllipse(QPointF(heroX + imgHero.width() / 2, heroY + imgHero.height() / 2), 50, 50);
     }
 
-    // 敌人
     for (const auto &e : enemies)
     {
         if (e.type == 10)
-        { // BOSS
-            // 预警
+        {
+            // 预警绘制
             if (e.state == STATE_WARNING || e.isWarning)
             {
                 if (!e.warningRect.isEmpty())
@@ -687,12 +684,12 @@ void GameWidget::paintEvent(QPaintEvent *event)
         }
     }
 
-    // 子弹
     p.setPen(Qt::NoPen);
     for (const auto &b : bullets)
     {
         if (!b.active)
             continue;
+
         if (b.isEnemy)
         {
             if (b.isSpecial)
@@ -778,7 +775,7 @@ void GameWidget::paintEvent(QPaintEvent *event)
         }
     }
 
-    p.restore(); // === UI ===
+    p.restore(); // === 恢复坐标系 ===
 
     if (nukeFlashOpacity > 0)
     {
@@ -794,7 +791,7 @@ void GameWidget::paintEvent(QPaintEvent *event)
     p.drawText(textMargin, 100, "HP:");
     p.setBrush(Qt::gray);
     p.drawRect(textMargin + 40, 85, 200, 15);
-    PlaneStats s = DataManager::getPlaneStats(currentPlaneId);
+    PlaneStats s = DataManager::getFinalStats(currentPlaneId);
     float hpRatio = (float)heroHp / s.hp;
     if (hpRatio < 0)
         hpRatio = 0;
@@ -823,23 +820,29 @@ void GameWidget::paintEvent(QPaintEvent *event)
     }
 }
 
-// UI 绘制
+// UI 绘制辅助
 void GameWidget::drawProgressBar(QPainter &p)
 {
     int barWidth = 12;
     int barHeight = 180;
     int marginX = 20;
     int marginY = 60;
+
     int barX = width() - barWidth - marginX;
     int barY = marginY;
+
     p.setPen(QPen(QColor(0, 255, 255, 100), 1));
     p.setBrush(QColor(0, 20, 40, 200));
     p.drawRect(barX, barY, barWidth, barHeight);
+
     float percentage = 0;
     if (currentLevelConfig.totalWaves > 0)
+    {
         percentage = (float)progressCounter / (float)currentLevelConfig.totalWaves;
+    }
     if (percentage > 1.0f)
         percentage = 1.0f;
+
     if (percentage > 0)
     {
         int fillHeight = (int)((barHeight - 2) * percentage);
@@ -850,6 +853,7 @@ void GameWidget::drawProgressBar(QPainter &p)
         p.setBrush(gradient);
         p.drawRect(barX + 1, barY + barHeight - fillHeight - 1, barWidth - 2, fillHeight);
     }
+
     int iconSize = 50;
     int iconX = barX + barWidth / 2 - iconSize / 2;
     int iconY = barY - iconSize - 5;
@@ -859,15 +863,19 @@ void GameWidget::drawProgressBar(QPainter &p)
 void GameWidget::drawUltUI(QPainter &p)
 {
     int iconSize = 70;
-    int x = 30;
-    int y = height() - iconSize - 30;
+    int margin = 20;
+    int x = margin;
+    int y = height() - iconSize - margin;
+
     p.setBrush(QColor(0, 0, 0, 180));
     p.setPen(QPen(Qt::white, 2));
     p.drawEllipse(x, y, iconSize, iconSize);
+
     QImage icon = imgHero.scaled(iconSize - 20, iconSize - 20, Qt::KeepAspectRatio);
     int imgX = x + (iconSize - icon.width()) / 2;
     int imgY = y + (iconSize - icon.height()) / 2;
     p.drawImage(imgX, imgY, icon);
+
     if (isShieldActive || isTimeFrozen)
     {
         p.setBrush(Qt::NoBrush);
@@ -878,6 +886,7 @@ void GameWidget::drawUltUI(QPainter &p)
         p.drawText(x, y - 20, iconSize, 20, Qt::AlignCenter, "ACTIVE");
         return;
     }
+
     if (ultCooldownTimer < ULT_COOLDOWN_MAX)
     {
         p.setBrush(QColor(0, 0, 0, 200));
@@ -910,6 +919,13 @@ void GameWidget::gameOver()
         setCursor(Qt::ArrowCursor);
         int coinsEarned = score / 10;
         DataManager::addCoins(coinsEarned);
+
+        // 【新增】失败时也可能有掉落装备
+        int dropId = DataManager::generateDrop(currentLevelConfig.levelId);
+        if (dropId > 0 && QRandomGenerator::global()->bounded(100) < 10)
+        { // 10%概率
+            DataManager::addEquipment(dropId);
+        }
     }
 }
 
@@ -925,6 +941,20 @@ void GameWidget::victory()
         LevelManager::unlockNextLevel(currentLevelConfig.levelId);
         int coinsEarned = score / 10;
         DataManager::addCoins(coinsEarned);
+
+        // 掉落装备
+        int dropId = DataManager::generateDrop(currentLevelConfig.levelId);
+        if (dropId > 0)
+        {
+            DataManager::addEquipment(dropId);
+            Equipment eq = DataManager::getEquipmentById(dropId);
+            QMessageBox::information(this, "战斗胜利",
+                                     QString("关卡完成！\n获得战利品：%1 金币\n获得装备：[%2] %3")
+                                         .arg(coinsEarned)
+                                         .arg(eq.tier == TIER_EPIC ? "极品" : eq.tier == TIER_RARE ? "优良"
+                                                                                                   : "普通")
+                                         .arg(eq.name));
+        }
     }
 }
 

@@ -4,10 +4,12 @@
 #include <QWidget>
 #include <QStackedWidget>
 #include "MenuWidget.h"
+#include "PlaneSelectWidget.h"
+#include "LevelSelectWidget.h"
 #include "GameWidget.h"
 #include "HighScoreWidget.h"
-#include "LevelSelectWidget.h"
-#include "PlaneSelectWidget.h" // 引用新头文件
+#include "ShopWidget.h"
+#include "EquipmentWidget.h"
 
 class MainWindow : public QWidget
 {
@@ -18,10 +20,12 @@ public:
 private:
     QStackedWidget *stack;
     MenuWidget *menu;
+    PlaneSelectWidget *planeSelect;
+    LevelSelectWidget *levelSelect;
     GameWidget *game;
     HighScoreWidget *highScore;
-    LevelSelectWidget *levelSelect;
-    PlaneSelectWidget *planeSelect; // 新增指针
+    ShopWidget *shop;
+    EquipmentWidget *equipment;
 };
 
 #endif // MAINWINDOW_H

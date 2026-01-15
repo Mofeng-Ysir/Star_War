@@ -17,8 +17,10 @@ public:
 
 signals:
     void startClicked();
+    void garageClicked(); // 机库
+    void equipClicked();  // 【新增】装备
+    void shopClicked();   // 【新增】商城
     void historyClicked();
-    void garageClicked(); // 新增信号
 
 protected:
     void paintEvent(QPaintEvent *event) override;

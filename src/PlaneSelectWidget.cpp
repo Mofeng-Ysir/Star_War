@@ -28,7 +28,7 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
     topLayout->addWidget(coinLabel);
     mainLayout->addLayout(topLayout);
 
-    mainLayout->addSpacing(20);
+    mainLayout->addSpacing(30);
 
     // 2. 飞机列表
     QHBoxLayout *planesLayout = new QHBoxLayout();
@@ -61,7 +61,7 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
     // 3. 详情框 (带滚动)
     QScrollArea *infoScroll = new QScrollArea(this);
     infoScroll->setWidgetResizable(true);
-    infoScroll->setFixedHeight(260); // 稍微加高以容纳进度条
+    infoScroll->setFixedHeight(260);
 
     infoScroll->setStyleSheet(R"(
         QScrollArea { border: 2px solid #00AAFF; background-color: rgba(0, 20, 40, 200); border-radius: 15px; }
@@ -86,10 +86,7 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
 
     QPushButton *btnBack = new QPushButton("返回主菜单");
     btnBack->setFixedSize(180, 60);
-    btnBack->setStyleSheet(R"(
-        QPushButton { background-color: #444; color: white; font-size: 20px; border-radius: 10px; }
-        QPushButton:hover { background-color: #666; }
-    )");
+    btnBack->setStyleSheet("QPushButton { background-color: #444; color: white; font-size: 20px; border-radius: 10px; } QPushButton:hover { background-color: #666; }");
     connect(btnBack, &QPushButton::clicked, this, &PlaneSelectWidget::backClicked);
 
     actionBtn = new QPushButton("操作");
@@ -104,14 +101,19 @@ PlaneSelectWidget::PlaneSelectWidget(QWidget *parent) : QWidget(parent)
             refreshUI(); 
         } else {
             int cost = DataManager::getPlaneStats(selectedPreviewId).cost;
-            if (DataManager::spendCoins(cost)) {
-                DataManager::unlockPlane(selectedPreviewId);
-                DataManager::setCurrentPlane(selectedPreviewId);
-                QMessageBox::information(this, "交易成功", "恭喜！新战机已入库！");
-                refreshUI();
+            // 【关键】检查金币是否足够
+            if (DataManager::getCoins() >= cost) {
+                if (DataManager::spendCoins(cost)) { // 尝试花费金币
+                    DataManager::unlockPlane(selectedPreviewId);
+                    DataManager::setCurrentPlane(selectedPreviewId); 
+                    QMessageBox::information(this, "交易成功", "恭喜！新战机已入库！");
+                } else {
+                     QMessageBox::warning(this, "失败", "金币不足！");
+                }
             } else {
-                QMessageBox::warning(this, "资金不足", "击败更多敌人来获取战利品吧！");
+                 QMessageBox::warning(this, "失败", "金币不足！");
             }
+            refreshUI(); 
         } });
 
     actionLayout->addWidget(btnBack);
@@ -129,6 +131,7 @@ void PlaneSelectWidget::refreshUI()
 
     int currentId = DataManager::getCurrentPlaneId();
 
+    // 更新飞机图标
     for (int i = 0; i < 5; ++i)
     {
         bool unlocked = DataManager::isPlaneUnlocked(i);
@@ -144,6 +147,7 @@ void PlaneSelectWidget::refreshUI()
         planeBtns[i]->setStyleSheet(style);
     }
 
+    // 更新详情文字
     PlaneStats s = DataManager::getPlaneStats(selectedPreviewId);
     bool isUnlocked = DataManager::isPlaneUnlocked(selectedPreviewId);
 
@@ -159,66 +163,55 @@ void PlaneSelectWidget::refreshUI()
         statusText = "<span style='color:#FF4444; font-weight:bold;'>[ 未解锁 ]</span>";
     }
 
-    // --- 核心修改：生成条形图 HTML ---
-    // 辅助 Lambda：生成一个进度条的 HTML 字符串
-    // val: 当前值, max: 最大值, color: 颜色
-    auto makeBar = [](double val, double max, QString color) -> QString
+    // 使用 HTML 表格来对齐属性和数值
+    auto makeBar = [&](double val, double max, QString color) -> QString
     {
-        int width = (int)((val / max) * 150); // 进度条总长 150px
-        if (width > 150)
-            width = 150;
-        // 使用 table 来模拟进度条，背景深灰，前景彩色
+        int width = (int)((val / max) * 120);
+        if (width < 0)
+            width = 0;
+        // 黑色背景+彩色进度条
         return QString(
-                   "<table width='150' border='0' cellspacing='0' cellpadding='0' bgcolor='#333333'>"
-                   "<tr><td width='%1' bgcolor='%2' height='8'></td>"
-                   "<td></td></tr></table>")
+                   "<div style='display: inline-block; width: 120px; height: 16px; background: rgba(0,0,0,200); border-radius: 8px; border: 1px solid #555; vertical-align: middle; margin-left: 10px;'>"
+                   "<div style='width:%1px; background: %2; height: 100%%; border-radius: 7px;'></div></div>")
             .arg(width)
             .arg(color);
     };
 
-    // 定义各项属性的最大值 (用于计算比例)
     const double MAX_ATK = 5.0;
     const double MAX_DEF = 5.0;
-    const double MAX_SPD = 3.0; // 射速
+    const double MAX_SPD = 3.0;
     const double MAX_HP = 8.0;
 
     QString html = QString(
-                       "<div>"
-                       "   <table width='100%'>"
+                       "<div style='line-height: 2.0;'>" // 设置行高
+                       "   <table width='100%%' border='0' cellspacing='0' cellpadding='0'>"
                        "   <tr>"
                        "       <td colspan='2'><span style='font-size:32px; font-weight:bold; color:#FFF;'>%1</span> &nbsp; %2</td>"
                        "   </tr>"
-                       "   <tr><td colspan='2'><hr></td></tr>"
+                       "   <tr><td colspan='2'><hr style='height:2px; background: #00AAFF;'></td></tr>" // 分隔线
 
-                       // 第一行：攻击 & 防御
-                       "   <tr>"
-                       "       <td width='50%'>"
-                       "           <span style='font-size:18px; color:#AAA;'>攻击火力: </span><span style='font-size:22px; color:#FF4444; font-weight:bold;'>%3</span><br>"
-                       "           %4" // 攻击条
+                       "   <tr>" // 攻击 & 防御
+                       "       <td width='50%%' style='padding-bottom: 15px; padding-right: 10px;'>"
+                       "           <span style='font-size:18px; color:#AAA;'>攻击火力: </span><span style='font-size:22px; color:#FF4444; font-weight:bold;'>%3</span>%4<br>"
                        "       </td>"
-                       "       <td width='50%'>"
-                       "           <span style='font-size:18px; color:#AAA;'>装甲防御: </span><span style='font-size:22px; color:#4444FF; font-weight:bold;'>%5</span><br>"
-                       "           %6" // 防御条
+                       "       <td width='50%' style='padding-bottom: 15px; padding-left: 10px;'>"
+                       "           <span style='font-size:18px; color:#AAA;'>装甲防御: </span><span style='font-size:22px; color:#4444FF; font-weight:bold;'>%5</span>%6<br>"
                        "       </td>"
                        "   </tr>"
-                       "   <tr><td colspan='2' height='10'></td></tr>" // 空行间距
 
-                       // 第二行：射速 & 耐久
-                       "   <tr>"
-                       "       <td>"
-                       "           <span style='font-size:18px; color:#AAA;'>武器射速: </span><span style='font-size:22px; color:#FFFF00; font-weight:bold;'>%7</span><br>"
-                       "           %8" // 射速条
+                       "   <tr>" // 射速 & 耐久
+                       "       <td style='padding-top: 15px; padding-right: 10px;'>"
+                       "           <span style='font-size:18px; color:#AAA;'>武器射速: </span><span style='font-size:22px; color:#FFFF00; font-weight:bold;'>%7</span>%8<br>"
                        "       </td>"
-                       "       <td>"
-                       "           <span style='font-size:18px; color:#AAA;'>舰体耐久: </span><span style='font-size:22px; color:#00FF00; font-weight:bold;'>%9</span><br>"
-                       "           %10" // 耐久条
+                       "       <td style='padding-top: 15px; padding-left: 10px;'>"
+                       "           <span style='font-size:18px; color:#AAA;'>舰体耐久: </span><span style='font-size:22px; color:#00FF00; font-weight:bold;'>%9</span>%10<br>"
                        "       </td>"
                        "   </tr>"
                        "   </table>"
 
                        "<br>"
                        "   <span style='font-size:22px; color:gold;'>售价: %11</span><br>"
-                       "   <span style='font-size:18px; color:#DDD;'>%12</span>"
+                       "   <span style='font-size:18px; color:#DDD;'>%12</span>" // 描述
                        "</div>")
                        .arg(s.name)
                        .arg(statusText)
@@ -231,11 +224,12 @@ void PlaneSelectWidget::refreshUI()
                        .arg(s.viewHp)
                        .arg(makeBar(s.viewHp, MAX_HP, "#00FF00"))
                        .arg(s.cost)
-                       .arg(s.desc.replace("\n", "<br>"));
+                       .arg(s.desc.replace("\n", "<br>")); // 换行符转成 HTML br
 
     infoLabel->setText(html);
 
-    if (isUnlocked)
+    // 按钮状态
+    if (DataManager::isPlaneUnlocked(selectedPreviewId))
     {
         if (selectedPreviewId == currentId)
         {
@@ -252,7 +246,7 @@ void PlaneSelectWidget::refreshUI()
     }
     else
     {
-        actionBtn->setText("购买");
+        actionBtn->setText("购买 (" + QString::number(s.cost) + ")");
         actionBtn->setEnabled(true);
         if (DataManager::getCoins() >= s.cost)
         {

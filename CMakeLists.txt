@@ -12,23 +12,32 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# 解决多个 CL.EXE 进程同时写入 PDB 文件的问题
+if(MSVC)
+    # 使用 /FS 允许多个编译器实例共享单个 PDB 文件
+    string(APPEND CMAKE_CXX_FLAGS " /FS")
+    # 或者禁用并行编译（更保险）
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi")
+endif()
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets)
 
 # --- 关键修改 1: 在源文件名前加上 src/ 前缀 ---
 add_executable(QtSpaceShooter
     src/main.cpp
-    src/common.h
-    src/MainWindow.cpp       src/MainWindow.h
-    src/MenuWidget.cpp       src/MenuWidget.h
-    src/LevelSelectWidget.cpp src/LevelSelectWidget.h
-    src/PlaneSelectWidget.cpp src/PlaneSelectWidget.h
-    src/GameWidget.cpp       src/GameWidget.h
-    src/HighScoreWidget.cpp  src/HighScoreWidget.h
-    src/ScoreManager.cpp     src/ScoreManager.h
-    src/LevelManager.cpp     src/LevelManager.h
-    src/DataManager.cpp      src/DataManager.h
-    src/BossStrategy.cpp     src/BossStrategy.h
-    src/CollisionSystem.cpp  src/CollisionSystem.h
+    src/MainWindow.cpp
+    src/MenuWidget.cpp
+    src/LevelSelectWidget.cpp
+    src/PlaneSelectWidget.cpp
+    src/GameWidget.cpp
+    src/HighScoreWidget.cpp
+    src/ScoreManager.cpp
+    src/LevelManager.cpp
+    src/DataManager.cpp
+    src/BossStrategy.cpp
+    src/CollisionSystem.cpp
+    src/ShopWidget.cpp
+    src/EquipmentWidget.cpp
 )
 
 # --- 关键修改 2: 把 src 目录加入包含路径 ---
@@ -42,6 +51,9 @@ target_link_libraries(QtSpaceShooter PRIVATE
     Qt6::Multimedia 
     Qt6::MultimediaWidgets
 )
+
+# 为目标直接添加 /FS 编译选项
+target_compile_options(QtSpaceShooter PRIVATE /FS)
 
 # 复制资源文件夹 (保持不变，从根目录复制到构建目录)
 add_custom_command(TARGET QtSpaceShooter POST_BUILD
