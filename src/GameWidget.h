@@ -44,18 +44,11 @@ private:
     void victory();
     void cleanUp();
 
-    // --- 分辨率适配 (动态宽度) ---
-    const int LOGICAL_HEIGHT = 600; // 基准高度固定
-
-    // 获取当前的逻辑宽度
+    // --- 分辨率适配辅助 ---
+    const int LOGICAL_HEIGHT = 600;
     double getGameWidth();
-    // 获取当前的缩放比例
     double getGameScale();
-
-    // 【核心修复】补上了这个函数的声明
     void getScaleOffset(double &scale, double &offsetX, double &offsetY);
-
-    // 坐标映射
     QPointF mapToGame(const QPoint &pos);
 
     // 资源
@@ -67,7 +60,10 @@ private:
     // 音频
     QSoundEffect *shootSfx;
     QSoundEffect *explodeSfx;
-    QSoundEffect *ultSfx;
+
+    // 【核心修改】大招音效列表
+    QList<QSoundEffect *> ultSfxList;
+
     QMediaPlayer *bgmPlayer;
     QAudioOutput *bgmOutput;
 

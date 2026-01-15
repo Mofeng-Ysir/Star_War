@@ -11,7 +11,8 @@
 #include <QUrl>
 #include <QtMath>
 #include <QLinearGradient>
-#include <QPainterPath>
+#include <QRadialGradient>
+#include <QTime>
 
 // ================= 构造函数 =================
 GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
@@ -28,12 +29,24 @@ GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
     explodeSfx->setSource(QUrl::fromLocalFile("assets/explode.wav"));
     explodeSfx->setVolume(0.6);
 
-    ultSfx = new QSoundEffect(this);
-    if (QFileInfo::exists("assets/laser.wav"))
-        ultSfx->setSource(QUrl::fromLocalFile("assets/laser.wav"));
-    else
-        ultSfx->setSource(QUrl::fromLocalFile("assets/shoot.wav"));
-    ultSfx->setVolume(1.0);
+    // 【核心修改】加载5个专属技能音效
+    ultSfxList.clear();
+    for (int i = 0; i < 5; ++i)
+    {
+        QSoundEffect *sfx = new QSoundEffect(this);
+        QString path = QString("assets/ult%1.wav").arg(i);
+        // 兜底：如果没有专属音效，用 laser.wav 或 shoot.wav
+        if (!QFileInfo::exists(path))
+        {
+            if (QFileInfo::exists("assets/laser.wav"))
+                path = "assets/laser.wav";
+            else
+                path = "assets/shoot.wav";
+        }
+        sfx->setSource(QUrl::fromLocalFile(path));
+        sfx->setVolume(1.0);
+        ultSfxList.append(sfx);
+    }
 
     // BGM 初始化
     bgmPlayer = new QMediaPlayer(this);
@@ -41,7 +54,7 @@ GameWidget::GameWidget(QWidget *parent) : QWidget(parent)
     bgmPlayer->setAudioOutput(bgmOutput);
     bgmOutput->setVolume(0.3);
 
-    // GIF 初始化
+    // BOSS 动画初始化
     bossMovie = new QMovie(this);
     bossMovie->setCacheMode(QMovie::CacheAll);
 
@@ -75,6 +88,7 @@ void GameWidget::loadAssets()
     if (!imgEnemy3.isNull())
         imgEnemy3 = imgEnemy3.scaled(120, 120, Qt::KeepAspectRatio);
 
+    // 加载5种子弹图片
     bulletImages.clear();
     for (int i = 0; i < 5; ++i)
     {
@@ -112,12 +126,13 @@ QPointF GameWidget::mapToGame(const QPoint &pos)
     return QPointF(pos.x() / scale, pos.y() / scale);
 }
 
-// ================= 游戏开始 =================
+// ================= 游戏流程控制 =================
 void GameWidget::startGame(int level)
 {
     setCursor(Qt::BlankCursor);
     currentLevelConfig = LevelManager::getLevelConfig(level);
 
+    // 加载战机
     currentPlaneId = DataManager::getCurrentPlaneId();
     PlaneStats stats = DataManager::getPlaneStats(currentPlaneId);
 
@@ -140,6 +155,7 @@ void GameWidget::startGame(int level)
     else
         imgHero = imgHero.scaled(60, 60, Qt::KeepAspectRatio);
 
+    // 加载 BOSS 头像
     QString bossIconPath = QString("assets/boss%1.png").arg(level);
     if (!QFileInfo::exists(bossIconPath))
         bossIconPath = QString("assets/boss%1.gif").arg(level);
@@ -147,6 +163,7 @@ void GameWidget::startGame(int level)
         currentBossIcon = imgEnemy3;
     currentBossIcon = currentBossIcon.scaled(60, 60, Qt::KeepAspectRatio);
 
+    // 重置状态
     isGameOver = false;
     isVictory = false;
     heroShootTimer = 0;
@@ -188,7 +205,7 @@ void GameWidget::stopGame()
     setCursor(Qt::ArrowCursor);
 }
 
-// ================= 大招逻辑 =================
+// ================= 大招逻辑 (核心修复) =================
 void GameWidget::fireUlt()
 {
     if (isGameOver || isVictory)
@@ -197,7 +214,12 @@ void GameWidget::fireUlt()
     if (ultCooldownTimer >= ULT_COOLDOWN_MAX && !isUltActive && !isShieldActive && !isTimeFrozen)
     {
         ultCooldownTimer = 0;
-        ultSfx->play();
+
+        // 【新增】播放对应战机的技能音效
+        if (currentPlaneId >= 0 && currentPlaneId < ultSfxList.size())
+        {
+            ultSfxList[currentPlaneId]->play();
+        }
 
         switch (currentPlaneId)
         {
@@ -205,9 +227,11 @@ void GameWidget::fireUlt()
             isUltActive = true;
             ultDurationTimer = 20;
             break;
+
         case PLANE_DOUBLE:
             for (int i = 0; i < 36; i++)
             {
+                // 【修复】之前这里少了 Bullet b; 的定义
                 Bullet b;
                 b.x = heroX + imgHero.width() / 2;
                 b.y = heroY;
@@ -219,6 +243,7 @@ void GameWidget::fireUlt()
                 bullets.append(b);
             }
             break;
+
         case PLANE_SHOTGUN:
             for (auto &b : bullets)
                 if (b.isEnemy)
@@ -243,10 +268,12 @@ void GameWidget::fireUlt()
             nukeFlashOpacity = 255;
             explodeSfx->play();
             break;
+
         case PLANE_SNIPER:
             isShieldActive = true;
             shieldTimer = 300;
             break;
+
         case PLANE_ALIEN:
             isTimeFrozen = true;
             freezeTimer = 300;
@@ -493,7 +520,7 @@ void GameWidget::spawnEnemy()
         e.shootTimer = 0;
         e.moveAngle = 0;
         e.bossId = 0;
-        e.isWarning = false; // 初始化
+        e.isWarning = false;
 
         int r = QRandomGenerator::global()->bounded(100);
         if (r < 60)
@@ -558,34 +585,30 @@ void GameWidget::spawnBoss()
     enemies.append(boss);
 }
 
-// ================= 绘制 (核心修改) =================
+// ================= 绘制 =================
 void GameWidget::paintEvent(QPaintEvent *event)
 {
     QPainter p(this);
 
-    // 1. 全屏背景 (铺满)
+    // 1. 全屏背景
     if (!imgBg.isNull())
         p.drawImage(rect(), imgBg);
     else
         p.fillRect(rect(), Qt::black);
 
-    // 2. === 进入游戏坐标系 (缩放+居中) ===
-    p.save(); // 【保存状态 A】
-
-    double scale, dx, dy;
-    getScaleOffset(scale, dx, dy);
-
-    // 裁剪区域 (只在游戏有效区域内绘制子弹和敌人)
+    // 2. 坐标变换
+    double scale = getGameScale();
     double gameW = getGameWidth();
-    p.translate(dx, dy);
+
+    p.save();
     p.scale(scale, scale);
     p.setClipRect(0, 0, (int)gameW, LOGICAL_HEIGHT);
 
-    // --- 绘制游戏内元素 ---
-
+    // 3. 绘制游戏内容
     if (isTimeFrozen)
         p.fillRect(QRect(0, 0, (int)gameW, LOGICAL_HEIGHT), QColor(0, 0, 255, 50));
 
+    // 激光
     if (currentPlaneId == PLANE_DEFAULT && isUltActive)
     {
         QLinearGradient gradient(heroX + imgHero.width() / 2 - 40, 0, heroX + imgHero.width() / 2 + 40, 0);
@@ -606,12 +629,12 @@ void GameWidget::paintEvent(QPaintEvent *event)
         p.drawEllipse(QPointF(heroX + imgHero.width() / 2, heroY + imgHero.height() / 2), 50, 50);
     }
 
-    // 绘制敌人
+    // 敌人
     for (const auto &e : enemies)
     {
         if (e.type == 10)
         { // BOSS
-            // 预警绘制
+            // 预警
             if (e.state == STATE_WARNING || e.isWarning)
             {
                 if (!e.warningRect.isEmpty())
@@ -630,11 +653,15 @@ void GameWidget::paintEvent(QPaintEvent *event)
                     p.setPen(QPen(Qt::red, 3));
                     p.setBrush(Qt::NoBrush);
                     p.drawEllipse(QPointF(e.attackTargetX, e.attackTargetY), 30, 30);
+                    if (e.state == STATE_SKILL_DASH)
+                    {
+                        p.setOpacity(0.5);
+                        p.drawImage(e.x - e.dashSpeedX * 2, e.y - e.dashSpeedY * 2, imgEnemy3);
+                    }
                     p.restore();
                 }
             }
 
-            // Boss GIF
             if (bossMovie->isValid() && (bossMovie->state() == QMovie::Running || bossMovie->state() == QMovie::Paused))
             {
                 p.drawPixmap(QRect(e.x, e.y, 200, 150), bossMovie->currentPixmap());
@@ -643,7 +670,6 @@ void GameWidget::paintEvent(QPaintEvent *event)
             {
                 p.drawImage(e.x, e.y, imgEnemy3);
             }
-            // 血条
             p.setBrush(Qt::red);
             p.drawRect(e.x, e.y - 15, 200, 8);
             p.setBrush(Qt::green);
@@ -670,7 +696,7 @@ void GameWidget::paintEvent(QPaintEvent *event)
         if (b.isEnemy)
         {
             if (b.isSpecial)
-            { // 特殊弹
+            {
                 QRadialGradient gradient(b.x + 10, b.y + 10, 15);
                 gradient.setColorAt(0.0, Qt::white);
                 gradient.setColorAt(0.5, QColor(0, 255, 255));
@@ -679,7 +705,7 @@ void GameWidget::paintEvent(QPaintEvent *event)
                 p.drawEllipse(b.x, b.y, 20, 20);
             }
             else
-            { // 普通弹
+            {
                 QRadialGradient gradient(b.x + 4, b.y + 4, 6);
                 gradient.setColorAt(0.0, QColor(255, 255, 255));
                 gradient.setColorAt(0.5, QColor(255, 0, 0));
@@ -698,31 +724,73 @@ void GameWidget::paintEvent(QPaintEvent *event)
             }
             if (!hasImage)
             {
-                // 兜底绘制逻辑... (省略以节省篇幅，可保留之前的switch case)
-                p.setBrush(Qt::yellow);
-                p.drawEllipse(b.x, b.y, 8, 8);
+                switch (currentPlaneId)
+                {
+                case PLANE_DEFAULT:
+                {
+                    QLinearGradient g(b.x, b.y, b.x, b.y + 15);
+                    g.setColorAt(0, QColor(255, 255, 200));
+                    g.setColorAt(1, QColor(255, 165, 0));
+                    p.setBrush(g);
+                    p.drawRect(b.x + 2, b.y, 4, 14);
+                    break;
+                }
+                case PLANE_DOUBLE:
+                {
+                    QRadialGradient g(b.x + 4, b.y + 6, 8);
+                    g.setColorAt(0, Qt::white);
+                    g.setColorAt(0.6, QColor(0, 200, 255));
+                    g.setColorAt(1, QColor(0, 0, 255, 0));
+                    p.setBrush(g);
+                    p.drawEllipse(b.x, b.y, 8, 12);
+                    break;
+                }
+                case PLANE_SHOTGUN:
+                {
+                    QRadialGradient g(b.x + 5, b.y + 5, 6);
+                    g.setColorAt(0, Qt::white);
+                    g.setColorAt(0.5, QColor(255, 50, 0));
+                    g.setColorAt(1, QColor(100, 0, 0, 0));
+                    p.setBrush(g);
+                    p.drawEllipse(b.x, b.y, 10, 10);
+                    break;
+                }
+                case PLANE_SNIPER:
+                {
+                    p.setBrush(QColor(200, 0, 255, 100));
+                    p.drawRect(b.x + 1, b.y - 5, 6, 25);
+                    p.setBrush(Qt::white);
+                    p.drawRect(b.x + 3, b.y, 2, 20);
+                    break;
+                }
+                case PLANE_ALIEN:
+                {
+                    QRadialGradient g(b.x + 4, b.y + 4, 6);
+                    g.setColorAt(0, QColor(200, 255, 200));
+                    g.setColorAt(0.5, QColor(0, 255, 0));
+                    g.setColorAt(1, QColor(0, 50, 0, 0));
+                    p.setBrush(g);
+                    p.drawEllipse(b.x, b.y, 8, 8);
+                    break;
+                }
+                }
             }
         }
     }
 
-    p.restore(); // 【恢复状态 A】-> 回到全屏坐标系 (UI 层)
+    p.restore(); // === UI ===
 
-    // ================== 第 3 层：UI 覆盖层 (不缩放，贴边) ==================
-
-    // 核弹白屏
     if (nukeFlashOpacity > 0)
     {
         p.fillRect(rect(), QColor(255, 255, 255, nukeFlashOpacity));
     }
 
-    // 左上角信息
     p.setPen(Qt::white);
     p.setFont(QFont("Arial", 16, QFont::Bold));
     int textMargin = 20;
     p.drawText(textMargin, 40, "Level " + QString::number(currentLevelConfig.levelId));
     p.drawText(textMargin, 70, "Score: " + QString::number(score));
 
-    // 英雄血条
     p.drawText(textMargin, 100, "HP:");
     p.setBrush(Qt::gray);
     p.drawRect(textMargin + 40, 85, 200, 15);
@@ -736,11 +804,9 @@ void GameWidget::paintEvent(QPaintEvent *event)
         p.setBrush(Qt::red);
     p.drawRect(textMargin + 40, 85, 200 * hpRatio, 15);
 
-    // 绘制贴边 UI
-    drawProgressBar(p); // 右上
-    drawUltUI(p);       // 左下
+    drawProgressBar(p);
+    drawUltUI(p);
 
-    // 游戏结束/胜利 (屏幕居中)
     if (isGameOver)
     {
         p.setPen(Qt::red);
@@ -757,36 +823,23 @@ void GameWidget::paintEvent(QPaintEvent *event)
     }
 }
 
-// UI: 进度条 (右上角贴边)
+// UI 绘制
 void GameWidget::drawProgressBar(QPainter &p)
 {
-    int barWidth = 10;
-    int barHeight = 250;
-    int iconSize = 50;
-
-    // 紧贴右侧 (width() 是真实全屏宽度)
-    int barX = width() - barWidth - 10;
-    int topMargin = 10;
-    int barY = topMargin + iconSize + 5;
-
-    // BOSS头像 (进度条正上方)
-    int iconX = barX + (barWidth / 2) - (iconSize / 2);
-    int iconY = topMargin;
-
-    // 【修改】移除外框，只有图片
-    p.drawImage(iconX, iconY, currentBossIcon.scaled(iconSize, iconSize, Qt::KeepAspectRatioByExpanding));
-
-    // 槽体
-    p.setPen(QPen(QColor(255, 255, 255, 100), 1));
+    int barWidth = 12;
+    int barHeight = 180;
+    int marginX = 20;
+    int marginY = 60;
+    int barX = width() - barWidth - marginX;
+    int barY = marginY;
+    p.setPen(QPen(QColor(0, 255, 255, 100), 1));
     p.setBrush(QColor(0, 20, 40, 200));
     p.drawRect(barX, barY, barWidth, barHeight);
-
     float percentage = 0;
     if (currentLevelConfig.totalWaves > 0)
         percentage = (float)progressCounter / (float)currentLevelConfig.totalWaves;
     if (percentage > 1.0f)
         percentage = 1.0f;
-
     if (percentage > 0)
     {
         int fillHeight = (int)((barHeight - 2) * percentage);
@@ -797,25 +850,24 @@ void GameWidget::drawProgressBar(QPainter &p)
         p.setBrush(gradient);
         p.drawRect(barX + 1, barY + barHeight - fillHeight - 1, barWidth - 2, fillHeight);
     }
+    int iconSize = 50;
+    int iconX = barX + barWidth / 2 - iconSize / 2;
+    int iconY = barY - iconSize - 5;
+    p.drawImage(iconX, iconY, currentBossIcon.scaled(iconSize, iconSize, Qt::KeepAspectRatioByExpanding));
 }
 
-// UI: 技能 (左下角贴边)
 void GameWidget::drawUltUI(QPainter &p)
 {
     int iconSize = 70;
-    int margin = 20;
-    int x = margin;
-    int y = height() - iconSize - margin; // 紧贴底部
-
+    int x = 30;
+    int y = height() - iconSize - 30;
     p.setBrush(QColor(0, 0, 0, 180));
     p.setPen(QPen(Qt::white, 2));
     p.drawEllipse(x, y, iconSize, iconSize);
-
     QImage icon = imgHero.scaled(iconSize - 20, iconSize - 20, Qt::KeepAspectRatio);
     int imgX = x + (iconSize - icon.width()) / 2;
     int imgY = y + (iconSize - icon.height()) / 2;
     p.drawImage(imgX, imgY, icon);
-
     if (isShieldActive || isTimeFrozen)
     {
         p.setBrush(Qt::NoBrush);
@@ -826,7 +878,6 @@ void GameWidget::drawUltUI(QPainter &p)
         p.drawText(x, y - 20, iconSize, 20, Qt::AlignCenter, "ACTIVE");
         return;
     }
-
     if (ultCooldownTimer < ULT_COOLDOWN_MAX)
     {
         p.setBrush(QColor(0, 0, 0, 200));
@@ -848,7 +899,7 @@ void GameWidget::drawUltUI(QPainter &p)
     p.drawText(x, y + iconSize + 5, iconSize, 20, Qt::AlignCenter, "ULT");
 }
 
-// ================= 结算逻辑 =================
+// 结算逻辑
 void GameWidget::gameOver()
 {
     if (!isGameOver && !isVictory)
@@ -877,7 +928,7 @@ void GameWidget::victory()
     }
 }
 
-// ================= 输入映射 =================
+// 输入映射
 void GameWidget::mouseMoveEvent(QMouseEvent *event)
 {
     if (isGameOver || isVictory)
